@@ -1,6 +1,6 @@
 [project]
 name = "portguardian"
-version = "1.0.0"
+version = "0.1.0"
 description = "A htop-like TUI for network ports, processes and systemd services"
 requires-python = ">=3.12"
 license = {text = "MIT"}
