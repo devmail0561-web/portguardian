@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PortGuardian — Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <meta http-equiv="refresh" content="15">
+</head>
+<body>
+    <header>
+        <h1>&#x1f6e1; PortGuardian</h1>
+        <p class="subtitle">Surveillance centralisée des ports réseau</p>
+    </header>
+
+    <main>
+        <section class="hosts">
+            <h2>Machines surveillées</h2>
+            {% if hosts %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Statut</th>
+                        <th>Hostname</th>
+                        <th>Connexions</th>
+                        <th>Ports en écoute</th>
+                        <th>Événements</th>
+                        <th>Dernière vue</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for host in hosts %}
+                    <tr class="host-row status-{{ host.status }}">
+                        <td>
+                            <span class="status-dot {{ host.status }}"></span>
+                            {{ host.status }}
+                        </td>
+                        <td><a href="/host/{{ host.hostname }}">{{ host.hostname }}</a></td>
+                        <td>{{ host.connections }}</td>
+                        <td>{{ host.listening }}</td>
+                        <td>{{ host.events }}</td>
+                        <td>{{ host.last_seen }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty">Aucun agent connecté. Lancez <code>portguardian-daemon run --server http://&lt;ce-serveur&gt;:8600</code> sur vos machines.</p>
+            {% endif %}
+        </section>
+
+        <section class="events">
+            <h2>Événements récents</h2>
+            {% if events %}
+            <ul class="event-list">
+                {% for event in events %}
+                <li class="event severity-{{ event.severity }}">
+                    <span class="event-host">{{ event.hostname }}</span>
+                    <span class="event-msg">{{ event.message }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="empty">Aucun événement.</p>
+            {% endif %}
+        </section>
+    </main>
+
+    <footer>
+        <p>PortGuardian v0.2 — auto-refresh 15s</p>
+    </footer>
+</body>
+</html>

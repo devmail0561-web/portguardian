@@ -1,0 +1,16 @@
+[Unit]
+Description=PortGuardian Agent — surveillance autonome des ports réseau
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/portguardian-daemon run
+Restart=on-failure
+RestartSec=10
+User=root
+Environment=XDG_CONFIG_HOME=/etc
+Environment=XDG_DATA_HOME=/var/lib
+
+[Install]
+WantedBy=multi-user.target

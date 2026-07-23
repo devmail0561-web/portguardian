@@ -1,0 +1,15 @@
+[Unit]
+Description=PortGuardian Server — dashboard web centralisé
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/portguardian-server --port 8600
+Restart=on-failure
+RestartSec=5
+User=portguardian
+Group=portguardian
+
+[Install]
+WantedBy=multi-user.target

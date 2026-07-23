@@ -1,8 +1,14 @@
 # PortGuardian
 
-**Surveillance des ports reseau, processus et services systemd en temps reel.**
+**Surveillance des ports reseau, processus et services systemd en temps reel — local et multi-machines.**
 
-PortGuardian est une application TUI (Terminal User Interface) de type htop, specialisee dans le monitoring des ports reseau, la gestion des processus et le controle des services systemd sous Linux (Ubuntu 24.04+). Construite avec Python 3.12+, Textual et psutil.
+PortGuardian est une application de monitoring des ports reseau pour Linux, avec trois modes d'utilisation :
+
+1. **TUI interactif** — interface terminal type htop (v1.0)
+2. **Agent daemon** — surveillance autonome avec notifications Slack/email/webhook (v0.2)
+3. **Serveur web** — dashboard centralise pour surveiller N machines depuis un navigateur (v0.2)
+
+Construite avec Python 3.12+, Textual, psutil et Flask.
 
 ---
 
@@ -59,6 +65,7 @@ uv pip install -r portguardian/requirements.txt
 | textual  | 0.75.0          | Interface TUI                 |
 | rich     | 13.7.0          | Formatage et rendu terminal   |
 | psutil   | 5.9.0           | Introspection systeme         |
+| flask    | 3.0.0           | Serveur web / dashboard       |
 
 ---
 
@@ -92,6 +99,69 @@ python3 main.py --once --format csv --output /tmp/ports.csv
 
 # Exporter en JSON vers un fichier
 python3 main.py --once --format json --output /var/log/ports.json
+```
+
+### Mode daemon (v0.2) — surveillance autonome
+
+L'agent tourne en arriere-plan, detecte les changements de ports, et notifie via Slack, email, ou webhook.
+
+```bash
+# Generer la configuration
+python3 -m daemon.cli init
+
+# Lancer un scan unique
+python3 -m daemon.cli once --json
+
+# Lancer l'agent en continu (toutes les 30s par defaut)
+python3 -m daemon.cli run --interval 30
+
+# Avec notifications Slack
+python3 -m daemon.cli run --slack https://hooks.slack.com/services/XXX/YYY/ZZZ
+
+# Avec push vers le serveur central
+python3 -m daemon.cli run --server http://monitoring.internal:8600 --api-key SECRET
+```
+
+Configuration : `~/.config/portguardian/daemon.json`
+
+#### Installation en service systemd
+
+```bash
+sudo cp daemon/portguardian-agent.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now portguardian-agent
+```
+
+### Mode serveur web (v0.2) — dashboard multi-machines
+
+Recoit les rapports des agents et expose un dashboard web temps reel.
+
+```bash
+# Lancer le serveur
+python3 -m server.cli --port 8600
+
+# Avec cle API obligatoire pour les agents
+python3 -m server.cli --port 8600 --api-key MY_SECRET_KEY
+```
+
+Puis ouvrir `http://localhost:8600` dans un navigateur.
+
+#### API REST du serveur
+
+| Endpoint                    | Methode | Description                    |
+|-----------------------------|---------|--------------------------------|
+| `/api/report`               | POST    | Reception des snapshots agents |
+| `/api/hosts`                | GET     | Liste des machines             |
+| `/api/hosts/<hostname>`     | GET     | Detail d'une machine           |
+| `/api/hosts/<hostname>/history` | GET | Historique d'une machine       |
+| `/api/events`               | GET     | Evenements globaux recents     |
+
+#### Installation en service systemd
+
+```bash
+sudo cp server/portguardian-server.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now portguardian-server
 ```
 
 ---
@@ -245,7 +315,22 @@ portguardian/
 │   ├── filters.py              # Filtres de recherche nommes et persistes
 │   ├── permissions.py          # Verification des privileges root
 │   └── logs.py                 # Configuration du logging applicatif
-├── ui/                         # Composants de l'interface utilisateur
+├── daemon/                     # Agent autonome (v0.2)
+│   ├── agent.py                # Collecte periodique + detection de changements
+│   ├── config.py               # Configuration daemon (JSON)
+│   ├── notifier.py             # Notifications multi-canal (Slack, email, webhook)
+│   ├── cli.py                  # CLI du daemon (run, once, init)
+│   └── portguardian-agent.service  # Fichier systemd
+├── server/                     # Serveur web centralise (v0.2)
+│   ├── app.py                  # API Flask + dashboard
+│   ├── cli.py                  # CLI du serveur
+│   ├── portguardian-server.service # Fichier systemd
+│   ├── templates/              # Templates HTML Jinja2
+│   │   ├── dashboard.html      # Vue d'ensemble multi-machines
+│   │   └── host.html           # Detail d'une machine
+│   └── static/
+│       └── style.css           # Theme dark GitHub-style
+├── ui/                         # Composants de l'interface TUI
 │   ├── dashboard.py            # Layout principal du tableau de bord
 │   ├── tables.py               # Tableau interactif (sparkline, DNS, baseline highlight)
 │   ├── details.py              # Panneau de details d'un processus
@@ -286,7 +371,10 @@ portguardian/
 |------------------------------------------------------|--------------------------------|
 | `~/.config/portguardian/rules.json`                  | Regles d'alerte                |
 | `~/.config/portguardian/filters.json`                | Filtres de recherche nommes    |
+| `~/.config/portguardian/daemon.json`                 | Configuration de l'agent daemon |
 | `~/.local/share/portguardian/baseline.json`          | Snapshot baseline              |
+| `~/.local/share/portguardian/daemon/latest.json`     | Dernier snapshot de l'agent    |
+| `~/.local/share/portguardian/daemon/history/`        | Historique des snapshots       |
 
 ---
 

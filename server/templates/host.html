@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PortGuardian — {{ host.hostname }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <meta http-equiv="refresh" content="15">
+</head>
+<body>
+    <header>
+        <h1><a href="/">&#x1f6e1; PortGuardian</a></h1>
+        <p class="subtitle">{{ host.hostname }}</p>
+    </header>
+
+    <main>
+        <section class="summary">
+            <div class="stat-card">
+                <span class="stat-value">{{ host.connections_total }}</span>
+                <span class="stat-label">Connexions</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value">{{ host.listening_total }}</span>
+                <span class="stat-label">Ports en écoute</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value">{{ host.iso_time }}</span>
+                <span class="stat-label">Dernier rapport</span>
+            </div>
+        </section>
+
+        <section class="listening-ports">
+            <h2>Ports en écoute</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Protocole</th>
+                        <th>Adresse</th>
+                        <th>Port</th>
+                        <th>Processus</th>
+                        <th>PID</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in host.listening %}
+                    <tr>
+                        <td>{{ c.protocol }}</td>
+                        <td>{{ c.local_addr }}</td>
+                        <td>{{ c.local_port }}</td>
+                        <td>{{ c.process_name }}</td>
+                        <td>{{ c.pid }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+        <section class="all-connections">
+            <h2>Toutes les connexions ({{ host.connections_total }})</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Proto</th>
+                        <th>Local</th>
+                        <th>Remote</th>
+                        <th>État</th>
+                        <th>Processus</th>
+                        <th>PID</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in host.connections %}
+                    <tr>
+                        <td>{{ c.protocol }}</td>
+                        <td>{{ c.local_addr }}:{{ c.local_port }}</td>
+                        <td>{{ c.remote_addr or '*' }}:{{ c.remote_port or '' }}</td>
+                        <td>{{ c.status }}</td>
+                        <td>{{ c.process_name }}</td>
+                        <td>{{ c.pid }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+        {% if host.events %}
+        <section class="events">
+            <h2>Événements</h2>
+            <ul class="event-list">
+                {% for event in host.events %}
+                <li class="event severity-{{ event.severity }}">{{ event.message }}</li>
+                {% endfor %}
+            </ul>
+        </section>
+        {% endif %}
+    </main>
+
+    <footer>
+        <p><a href="/">← Retour au dashboard</a> — auto-refresh 15s</p>
+    </footer>
+</body>
+</html>
