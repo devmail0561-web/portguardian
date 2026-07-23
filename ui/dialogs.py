@@ -38,12 +38,12 @@ class ConfirmDialog(ModalScreen[bool]):
 
     #confirm-buttons {
         align: center middle;
-        height: 3;
+        height: 1;
     }
 
     #confirm-buttons Button {
-        margin: 0 2;
-        min-width: 14;
+        margin: 0 1;
+        min-width: 12;
     }
     """
 
@@ -101,12 +101,12 @@ class SearchDialog(ModalScreen[str | None]):
 
     #search-buttons {
         align: center middle;
-        height: 3;
+        height: 1;
     }
 
     #search-buttons Button {
-        margin: 0 2;
-        min-width: 14;
+        margin: 0 1;
+        min-width: 12;
     }
     """
 
@@ -168,13 +168,13 @@ class SortDialog(ModalScreen):
 
     #sort-buttons {
         align: center middle;
-        height: 3;
+        height: 1;
         margin-top: 1;
     }
 
     #sort-buttons Button {
-        margin: 0 2;
-        min-width: 14;
+        margin: 0 1;
+        min-width: 12;
     }
     """
 
@@ -245,7 +245,7 @@ class ExportDialog(ModalScreen[str]):
 
     #export-buttons {
         align: center middle;
-        height: auto;
+        height: 1;
         margin-top: 1;
     }
 
@@ -305,7 +305,7 @@ class ServiceDialog(ModalScreen[str]):
 
     #service-buttons {
         align: center middle;
-        height: auto;
+        height: 1;
         margin-bottom: 1;
     }
 
@@ -390,13 +390,13 @@ class BlockPortDialog(ModalScreen[dict | None]):
 
     #block-buttons {
         align: center middle;
-        height: 3;
+        height: 1;
         margin-top: 1;
     }
 
     #block-buttons Button {
         margin: 0 1;
-        min-width: 14;
+        min-width: 12;
     }
     """
 
@@ -468,6 +468,121 @@ class BlockPortDialog(ModalScreen[dict | None]):
             values["action"] = "block"
             self.dismiss(values)
         elif event.button.id == "btn-unblock":
+            values = self._get_values()
+            values["action"] = "unblock"
+            self.dismiss(values)
+        else:
+            self.dismiss(None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
+class BlockIPDialog(ModalScreen[dict | None]):
+    """Dialogue de blocage/déblocage d'adresses IP."""
+
+    BINDINGS = [("escape", "cancel", "Annuler")]
+
+    DEFAULT_CSS = """
+    BlockIPDialog {
+        align: center middle;
+    }
+
+    #blockip-box {
+        width: 66;
+        height: auto;
+        padding: 1 2;
+        border: round $error;
+        background: $boost;
+    }
+
+    #blockip-title {
+        text-align: center;
+        text-style: bold;
+        color: $error;
+        padding: 0 0 1 0;
+    }
+
+    #blockip-hint {
+        color: $text-muted;
+        text-align: center;
+        margin-bottom: 1;
+    }
+
+    #blockip-input {
+        margin-bottom: 1;
+    }
+
+    .blockip-row {
+        height: auto;
+        margin-bottom: 1;
+        align: left middle;
+    }
+
+    #blockip-buttons {
+        align: center middle;
+        height: 1;
+        margin-top: 1;
+    }
+
+    #blockip-buttons Button {
+        margin: 0 1;
+        min-width: 12;
+    }
+    """
+
+    def __init__(self, prefill: str = "") -> None:
+        super().__init__()
+        self._prefill = prefill
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="blockip-box"):
+            yield Label("Bloquer / Débloquer des IPs", id="blockip-title")
+            yield Static(
+                "Formats : [bold]192.168.1.1[/bold]  [bold]10.0.0.0/24[/bold]  "
+                "[bold]1.2.3.4,5.6.7.8[/bold]",
+                id="blockip-hint",
+            )
+            yield Input(
+                value=self._prefill,
+                placeholder="ex: 192.168.1.100  ou  10.0.0.0/24,172.16.0.1",
+                id="blockip-input",
+            )
+            with Horizontal(classes="blockip-row"):
+                yield Label("Direction : ")
+                with RadioSet(id="blockip-dir"):
+                    yield RadioButton("Entrant", value=True, id="ipdir-in")
+                    yield RadioButton("Sortant", id="ipdir-out")
+                    yield RadioButton("Les deux", id="ipdir-both")
+            with Horizontal(id="blockip-buttons"):
+                yield Button("Bloquer", variant="error", id="btn-blockip")
+                yield Button("Débloquer", variant="warning", id="btn-unblockip")
+                yield Button("Annuler", variant="default", id="btn-blockip-cancel")
+
+    def on_mount(self) -> None:
+        self.query_one("#blockip-input", Input).focus()
+
+    def _get_values(self) -> dict:
+        spec = self.query_one("#blockip-input", Input).value.strip()
+
+        dir_map = {"ipdir-in": "in", "ipdir-out": "out", "ipdir-both": "both"}
+        direction = "in"
+        for radio_id, val in dir_map.items():
+            try:
+                if self.query_one(f"#{radio_id}", RadioButton).value:
+                    direction = val
+                    break
+            except Exception:
+                pass
+
+        return {"spec": spec, "direction": direction}
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-blockip":
+            values = self._get_values()
+            values["action"] = "block"
+            self.dismiss(values)
+        elif event.button.id == "btn-unblockip":
             values = self._get_values()
             values["action"] = "unblock"
             self.dismiss(values)
