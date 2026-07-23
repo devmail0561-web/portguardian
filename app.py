@@ -165,6 +165,7 @@ Button:hover {
         self._baseline_ts: float = 0.0
         self._filter_store = FilterStore()
         self._active_alerts: list = []
+        self._refresh_running = False
         self._load_baseline_on_start()
 
     def _load_baseline_on_start(self) -> None:
@@ -198,6 +199,13 @@ Button:hover {
         self.run_worker(self._refresh_data, exclusive=True, group="refresh")
 
     async def _refresh_data(self) -> None:
+        self._refresh_running = True
+        try:
+            await self._do_refresh()
+        finally:
+            self._refresh_running = False
+
+    async def _do_refresh(self) -> None:
         connections = await asyncio.to_thread(get_all_connections)
         self._all_connections = connections
 
@@ -280,6 +288,8 @@ Button:hover {
             logger.exception("Erreur lors de la mise à jour de l'UI")
 
     def _auto_refresh(self) -> None:
+        if self._refresh_running:
+            return
         self._trigger_refresh()
 
     # --- Événements table ---
