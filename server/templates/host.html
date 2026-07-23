@@ -4,99 +4,270 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PortGuardian — {{ host.hostname }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
-    <meta http-equiv="refresh" content="15">
 </head>
 <body>
-    <header>
-        <h1><a href="/">&#x1f6e1; PortGuardian</a></h1>
-        <p class="subtitle">{{ host.hostname }}</p>
-    </header>
+    <div class="app-layout">
+        <!-- Top bar -->
+        <nav class="topbar">
+            <div class="topbar-brand">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <h1>PortGuardian<span>v0.2</span></h1>
+            </div>
+            <div class="topbar-right">
+                <div class="refresh-indicator">
+                    <span class="dot"></span>
+                    <span>Live</span>
+                </div>
+                <span class="topbar-time" id="clock"></span>
+            </div>
+        </nav>
 
-    <main>
-        <section class="summary">
-            <div class="stat-card">
-                <span class="stat-value">{{ host.connections_total }}</span>
-                <span class="stat-label">Connexions</span>
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Monitoring</div>
+                <ul class="sidebar-nav">
+                    <li>
+                        <a href="/">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/api/events">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                            Evenements
+                        </a>
+                    </li>
+                </ul>
             </div>
-            <div class="stat-card">
-                <span class="stat-value">{{ host.listening_total }}</span>
-                <span class="stat-label">Ports en écoute</span>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Machine</div>
+                <ul class="sidebar-nav">
+                    <li>
+                        <a href="/host/{{ host.hostname }}" class="active">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                            {{ host.hostname }}
+                        </a>
+                    </li>
+                </ul>
             </div>
-            <div class="stat-card">
-                <span class="stat-value">{{ host.iso_time }}</span>
-                <span class="stat-label">Dernier rapport</span>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">API</div>
+                <ul class="sidebar-nav">
+                    <li>
+                        <a href="/api/hosts/{{ host.hostname }}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            JSON complet
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/api/hosts/{{ host.hostname }}/history">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            Historique
+                        </a>
+                    </li>
+                </ul>
             </div>
-        </section>
+        </aside>
 
-        <section class="listening-ports">
-            <h2>Ports en écoute</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Protocole</th>
-                        <th>Adresse</th>
-                        <th>Port</th>
-                        <th>Processus</th>
-                        <th>PID</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for c in host.listening %}
-                    <tr>
-                        <td>{{ c.protocol }}</td>
-                        <td>{{ c.local_addr }}</td>
-                        <td>{{ c.local_port }}</td>
-                        <td>{{ c.process_name }}</td>
-                        <td>{{ c.pid }}</td>
-                    </tr>
+        <!-- Main -->
+        <main class="main-content">
+            <div class="breadcrumb">
+                <a href="/">Dashboard</a>
+                <span class="breadcrumb-sep">&#x203a;</span>
+                <span class="breadcrumb-current">{{ host.hostname }}</span>
+            </div>
+
+            <div class="page-header">
+                <div>
+                    <h2 class="page-title">{{ host.hostname }}</h2>
+                    <p class="page-subtitle">Dernier rapport : {{ host.iso_time }}</p>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-card-label">Connexions</span>
+                        <div class="stat-card-icon blue">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                        </div>
+                    </div>
+                    <div class="stat-card-value">{{ host.connections_total }}</div>
+                    <div class="stat-card-sub">connexions actives</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-card-label">Ports en ecoute</span>
+                        <div class="stat-card-icon green">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        </div>
+                    </div>
+                    <div class="stat-card-value">{{ host.listening_total }}</div>
+                    <div class="stat-card-sub">ports LISTEN</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-card-label">Evenements</span>
+                        <div class="stat-card-icon yellow">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        </div>
+                    </div>
+                    <div class="stat-card-value">{{ host.events|length if host.events else 0 }}</div>
+                    <div class="stat-card-sub">depuis dernier scan</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-card-label">Bande passante</span>
+                        <div class="stat-card-icon red">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="4"/><polyline points="6 10 12 4 18 10"/></svg>
+                        </div>
+                    </div>
+                    <div class="stat-card-value">{{ host.bandwidth|length if host.bandwidth else 0 }}</div>
+                    <div class="stat-card-sub">interfaces reseau</div>
+                </div>
+            </div>
+
+            <!-- Listening ports -->
+            <div class="table-container">
+                <div class="table-header">
+                    <div>
+                        <span class="table-title">Ports en ecoute</span>
+                        <span class="table-count">{{ host.listening|length }} port{{ 's' if host.listening|length > 1 }}</span>
+                    </div>
+                    <div class="table-actions">
+                        <input type="text" class="table-filter" placeholder="Filtrer..." id="listen-filter">
+                    </div>
+                </div>
+                <table id="listen-table">
+                    <thead>
+                        <tr>
+                            <th>Protocole</th>
+                            <th>Adresse</th>
+                            <th>Port</th>
+                            <th>Processus</th>
+                            <th>PID</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in host.listening %}
+                        <tr>
+                            <td><span class="badge-proto">{{ c.protocol }}</span></td>
+                            <td><span class="proc-name">{{ c.local_addr }}</span></td>
+                            <td><span class="port-num">{{ c.local_port }}</span></td>
+                            <td><span class="proc-name">{{ c.process_name or '-' }}</span></td>
+                            <td><span class="pid">{{ c.pid or '-' }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- All connections -->
+            <div class="table-container">
+                <div class="table-header">
+                    <div>
+                        <span class="table-title">Toutes les connexions</span>
+                        <span class="table-count">{{ host.connections|length }} connexion{{ 's' if host.connections|length > 1 }}</span>
+                    </div>
+                    <div class="table-actions">
+                        <input type="text" class="table-filter" placeholder="Filtrer..." id="conn-filter">
+                    </div>
+                </div>
+                <table id="conn-table">
+                    <thead>
+                        <tr>
+                            <th>Proto</th>
+                            <th>Adresse locale</th>
+                            <th>Port</th>
+                            <th>Adresse distante</th>
+                            <th>Etat</th>
+                            <th>Processus</th>
+                            <th>PID</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in host.connections %}
+                        <tr>
+                            <td><span class="badge-proto">{{ c.protocol }}</span></td>
+                            <td><span class="proc-name">{{ c.local_addr }}</span></td>
+                            <td><span class="port-num">{{ c.local_port }}</span></td>
+                            <td><span class="proc-name">{{ c.remote_addr or '*' }}{% if c.remote_port %}:{{ c.remote_port }}{% endif %}</span></td>
+                            <td>
+                                {% if c.status == 'LISTEN' %}
+                                <span class="state-listen">{{ c.status }}</span>
+                                {% elif c.status == 'ESTABLISHED' %}
+                                <span class="state-established">{{ c.status }}</span>
+                                {% elif c.status in ('TIME_WAIT', 'CLOSE_WAIT') %}
+                                <span class="state-time-wait">{{ c.status }}</span>
+                                {% else %}
+                                <span class="state-other">{{ c.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td><span class="proc-name">{{ c.process_name or '-' }}</span></td>
+                            <td><span class="pid">{{ c.pid or '-' }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Events -->
+            {% if host.events %}
+            <div class="events-panel">
+                <div class="events-header">
+                    <span class="events-title">Evenements detectes</span>
+                </div>
+                <ul class="events-list">
+                    {% for event in host.events %}
+                    <li class="event-item">
+                        <span class="event-severity {{ event.severity }}"></span>
+                        <div class="event-content">
+                            <div class="event-message">{{ event.message }}</div>
+                            <div class="event-meta">{{ event.type }}</div>
+                        </div>
+                    </li>
                     {% endfor %}
-                </tbody>
-            </table>
-        </section>
+                </ul>
+            </div>
+            {% endif %}
+        </main>
+    </div>
 
-        <section class="all-connections">
-            <h2>Toutes les connexions ({{ host.connections_total }})</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Proto</th>
-                        <th>Local</th>
-                        <th>Remote</th>
-                        <th>État</th>
-                        <th>Processus</th>
-                        <th>PID</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for c in host.connections %}
-                    <tr>
-                        <td>{{ c.protocol }}</td>
-                        <td>{{ c.local_addr }}:{{ c.local_port }}</td>
-                        <td>{{ c.remote_addr or '*' }}:{{ c.remote_port or '' }}</td>
-                        <td>{{ c.status }}</td>
-                        <td>{{ c.process_name }}</td>
-                        <td>{{ c.pid }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </section>
+    <script>
+        // Clock
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').textContent =
+                now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+        updateClock();
+        setInterval(updateClock, 1000);
 
-        {% if host.events %}
-        <section class="events">
-            <h2>Événements</h2>
-            <ul class="event-list">
-                {% for event in host.events %}
-                <li class="event severity-{{ event.severity }}">{{ event.message }}</li>
-                {% endfor %}
-            </ul>
-        </section>
-        {% endif %}
-    </main>
+        // Filters
+        function setupFilter(inputId, tableId) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            input.addEventListener('input', function() {
+                const q = this.value.toLowerCase();
+                document.querySelectorAll('#' + tableId + ' tbody tr').forEach(row => {
+                    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+                });
+            });
+        }
+        setupFilter('listen-filter', 'listen-table');
+        setupFilter('conn-filter', 'conn-table');
 
-    <footer>
-        <p><a href="/">← Retour au dashboard</a> — auto-refresh 15s</p>
-    </footer>
+        // Auto-refresh
+        setTimeout(() => location.reload(), 15000);
+    </script>
 </body>
 </html>
