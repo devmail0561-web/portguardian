@@ -124,7 +124,7 @@ def _iptables_apply(
     if direction in ("in", "both"):
         chain_flags.append(("INPUT", "--dport"))
     if direction in ("out", "both"):
-        chain_flags.append(("OUTPUT", "--sport"))
+        chain_flags.append(("OUTPUT", "--dport"))
 
     errors: list[str] = []
     count = 0
@@ -211,7 +211,7 @@ def _nft_apply(
     if direction in ("in", "both"):
         chains.append(("input", "dport"))
     if direction in ("out", "both"):
-        chains.append(("output", "sport"))
+        chains.append(("output", "dport"))
 
     count = 0
     errors: list[str] = []
@@ -230,12 +230,15 @@ def _nft_apply(
                     ok, out = _run(["nft", "-a", "list", "chain", "inet", "portguardian", chain])
                     if not ok:
                         continue
+                    import re
                     handle = None
+                    pattern = re.compile(
+                        rf'\b{re.escape(proto)}\b.*\b{re.escape(port_kw)}\s+{re.escape(port_spec)}\b.*\bdrop\b.*#\s*handle\s+(\d+)'
+                    )
                     for line in out.splitlines():
-                        if proto in line and port_kw in line and port_spec in line and "drop" in line:
-                            for token in line.split():
-                                if token.isdigit():
-                                    handle = token
+                        m = pattern.search(line)
+                        if m:
+                            handle = m.group(1)
                             break
                     if handle is None:
                         continue
@@ -247,11 +250,29 @@ def _nft_apply(
                 else:
                     errors.append(msg)
 
+    if count:
+        _nft_persist()
+
     if action == "add":
         if not count:
             return False, "Aucune règle ajoutée. " + "; ".join(errors[:3])
         return True, f"{count} règle(s) nft ajoutée(s)"
     return True, f"{count} règle(s) nft supprimée(s)"
+
+
+def _nft_persist() -> None:
+    """Sauvegarde les règles nftables pour persistance au reboot."""
+    save_path = "/etc/nftables.d/portguardian.nft"
+    try:
+        import os
+        os.makedirs("/etc/nftables.d", exist_ok=True)
+        ok, out = _run(["nft", "list", "table", "inet", "portguardian"])
+        if ok:
+            with open(save_path, "w") as f:
+                f.write(out)
+            logger.info("Règles nft sauvegardées dans %s", save_path)
+    except Exception:
+        logger.warning("Impossible de sauvegarder les règles nftables")
 
 
 # ---------------------------------------------------------------------------
@@ -280,10 +301,13 @@ def _ufw_apply(
             ok, msg = _run(cmd)
             if ok:
                 count += 1
-                if direction == "both" and action == "deny":
-                    _run(["ufw", "out", "deny", f"{port_spec}/{proto}"])
             else:
                 errors.append(msg)
+            if direction == "both":
+                if action == "deny":
+                    _run(["ufw", "out", "deny", f"{port_spec}/{proto}"])
+                else:
+                    _run(["ufw", "--force", "delete", "out", "deny", f"{port_spec}/{proto}"])
 
     if action == "deny":
         if not count:
@@ -311,9 +335,7 @@ def _firewalld_apply(
         for start, end in segments:
             port_spec = str(start) if start == end else f"{start}-{end}"
             rule = (
-                f'rule family="ipv4" '
-                f'{"destination" if direction == "out" else "source"} '
-                f'port port="{port_spec}" protocol="{proto}" drop'
+                f'rule family="ipv4" port port="{port_spec}" protocol="{proto}" drop'
             )
             ok, msg = _run(["firewall-cmd", "--permanent", f"{verb}={rule}"])
             if ok:
@@ -412,3 +434,254 @@ def list_blocked_ports() -> list[str]:
                     rules.append(line.strip())
 
     return rules
+
+
+# ---------------------------------------------------------------------------
+# IP blocking
+# ---------------------------------------------------------------------------
+
+def _validate_ip(ip: str) -> str:
+    """Valide une adresse IP ou un CIDR. Retourne l'IP normalisée ou lève ValueError."""
+    import ipaddress
+    ip = ip.strip()
+    try:
+        if "/" in ip:
+            net = ipaddress.ip_network(ip, strict=False)
+            return str(net)
+        else:
+            addr = ipaddress.ip_address(ip)
+            return str(addr)
+    except ValueError:
+        raise ValueError(f"Adresse IP invalide : {ip}")
+
+
+def parse_ip_spec(spec: str) -> list[str]:
+    """Parse une liste d'IPs séparées par des virgules.
+
+    Formats acceptés :
+    - "192.168.1.1"
+    - "192.168.1.0/24"
+    - "10.0.0.1,10.0.0.2,172.16.0.0/16"
+    - "2001:db8::1"
+    """
+    ips: list[str] = []
+    for part in spec.replace(" ", "").split(","):
+        if not part:
+            continue
+        ips.append(_validate_ip(part))
+    if not ips:
+        raise ValueError("Spécification d'IP vide")
+    return ips
+
+
+def _iptables_apply_ip(
+    action: str,
+    ips: list[str],
+    direction: str,
+) -> tuple[bool, str]:
+    chain_flags: list[tuple[str, str]] = []
+    if direction in ("in", "both"):
+        chain_flags.append(("INPUT", "-s"))
+    if direction in ("out", "both"):
+        chain_flags.append(("OUTPUT", "-d"))
+
+    errors: list[str] = []
+    count = 0
+    for chain, flag in chain_flags:
+        for ip in ips:
+            ok, msg = _iptables([action, chain, flag, ip, "-j", "DROP"])
+            if ok:
+                count += 1
+            else:
+                errors.append(f"{chain}/{ip}: {msg}")
+
+    if action == "-A":
+        if not count:
+            return False, "Aucune règle ajoutée. " + "; ".join(errors[:3])
+        _iptables_persist()
+        return True, f"{count} règle(s) IP ajoutée(s)"
+    else:
+        _iptables_persist()
+        return True, f"{count} règle(s) IP supprimée(s)"
+
+
+def _nft_apply_ip(
+    action: str,
+    ips: list[str],
+    direction: str,
+) -> tuple[bool, str]:
+    if not _nft_ensure_table():
+        return False, "Impossible d'initialiser la table nftables portguardian"
+
+    chains = []
+    if direction in ("in", "both"):
+        chains.append(("input", "saddr"))
+    if direction in ("out", "both"):
+        chains.append(("output", "daddr"))
+
+    count = 0
+    errors: list[str] = []
+
+    for chain, addr_kw in chains:
+        for ip in ips:
+            if action == "add":
+                cmd = [
+                    "nft", "add", "rule", "inet", "portguardian", chain,
+                    "ip", addr_kw, ip, "drop",
+                ]
+            else:
+                import re
+                ok, out = _run(["nft", "-a", "list", "chain", "inet", "portguardian", chain])
+                if not ok:
+                    continue
+                handle = None
+                pattern = re.compile(
+                    rf'\bip\s+{re.escape(addr_kw)}\s+{re.escape(ip)}\b.*\bdrop\b.*#\s*handle\s+(\d+)'
+                )
+                for line in out.splitlines():
+                    m = pattern.search(line)
+                    if m:
+                        handle = m.group(1)
+                        break
+                if handle is None:
+                    continue
+                cmd = ["nft", "delete", "rule", "inet", "portguardian", chain, "handle", handle]
+
+            ok, msg = _run(cmd)
+            if ok:
+                count += 1
+            else:
+                errors.append(msg)
+
+    if count:
+        _nft_persist()
+
+    if action == "add":
+        if not count:
+            return False, "Aucune règle ajoutée. " + "; ".join(errors[:3])
+        return True, f"{count} règle(s) IP nft ajoutée(s)"
+    return True, f"{count} règle(s) IP nft supprimée(s)"
+
+
+def _ufw_apply_ip(
+    action: str,
+    ips: list[str],
+    direction: str,
+) -> tuple[bool, str]:
+    count = 0
+    errors: list[str] = []
+
+    for ip in ips:
+        if action == "deny":
+            if direction in ("in", "both"):
+                cmd = ["ufw", "deny", "from", ip]
+                ok, msg = _run(cmd)
+                if ok:
+                    count += 1
+                else:
+                    errors.append(msg)
+            if direction in ("out", "both"):
+                cmd = ["ufw", "deny", "out", "to", ip]
+                ok, msg = _run(cmd)
+                if ok:
+                    count += 1
+                else:
+                    errors.append(msg)
+        else:
+            if direction in ("in", "both"):
+                cmd = ["ufw", "--force", "delete", "deny", "from", ip]
+                ok, msg = _run(cmd)
+                if ok:
+                    count += 1
+                else:
+                    errors.append(msg)
+            if direction in ("out", "both"):
+                cmd = ["ufw", "--force", "delete", "deny", "out", "to", ip]
+                ok, msg = _run(cmd)
+                if ok:
+                    count += 1
+                else:
+                    errors.append(msg)
+
+    if action == "deny":
+        if not count:
+            return False, "; ".join(errors[:3])
+        return True, f"{count} règle(s) IP ufw ajoutée(s)"
+    return True, f"{count} règle(s) IP ufw supprimée(s)"
+
+
+def _firewalld_apply_ip(
+    action: str,
+    ips: list[str],
+    direction: str,
+) -> tuple[bool, str]:
+    verb = "--add-rich-rule" if action == "add" else "--remove-rich-rule"
+
+    count = 0
+    errors: list[str] = []
+    for ip in ips:
+        if direction in ("in", "both"):
+            rule = f'rule family="ipv4" source address="{ip}" drop'
+            ok, msg = _run(["firewall-cmd", "--permanent", f"{verb}={rule}"])
+            if ok:
+                count += 1
+            else:
+                errors.append(msg)
+        if direction in ("out", "both"):
+            rule = f'rule family="ipv4" destination address="{ip}" drop'
+            ok, msg = _run(["firewall-cmd", "--permanent", f"{verb}={rule}"])
+            if ok:
+                count += 1
+            else:
+                errors.append(msg)
+
+    if count:
+        _run(["firewall-cmd", "--reload"])
+
+    if action == "add":
+        if not count:
+            return False, "; ".join(errors[:3])
+        return True, f"{count} règle(s) IP firewalld ajoutée(s)"
+    return True, f"{count} règle(s) IP firewalld supprimée(s)"
+
+
+def block_ip(spec: str, direction: str = "in") -> tuple[bool, str]:
+    """Bloque les adresses IP décrites par spec via le backend firewall disponible."""
+    try:
+        ips = parse_ip_spec(spec)
+    except (ValueError, Exception) as e:
+        return False, str(e)
+
+    backend = get_backend()
+    logger.info("Blocage IP: spec=%s dir=%s backend=%s", spec, direction, backend)
+
+    if backend == "iptables":
+        return _iptables_apply_ip("-A", ips, direction)
+    if backend == "nft":
+        return _nft_apply_ip("add", ips, direction)
+    if backend == "ufw":
+        return _ufw_apply_ip("deny", ips, direction)
+    if backend == "firewalld":
+        return _firewalld_apply_ip("add", ips, direction)
+    return False, "Aucun backend firewall disponible"
+
+
+def unblock_ip(spec: str, direction: str = "in") -> tuple[bool, str]:
+    """Supprime les règles de blocage pour les IPs décrites par spec."""
+    try:
+        ips = parse_ip_spec(spec)
+    except (ValueError, Exception) as e:
+        return False, str(e)
+
+    backend = get_backend()
+    logger.info("Déblocage IP: spec=%s dir=%s backend=%s", spec, direction, backend)
+
+    if backend == "iptables":
+        return _iptables_apply_ip("-D", ips, direction)
+    if backend == "nft":
+        return _nft_apply_ip("delete", ips, direction)
+    if backend == "ufw":
+        return _ufw_apply_ip("delete", ips, direction)
+    if backend == "firewalld":
+        return _firewalld_apply_ip("remove", ips, direction)
+    return False, "Aucun backend firewall disponible"

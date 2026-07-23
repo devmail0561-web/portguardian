@@ -2,33 +2,39 @@
 
 **Surveillance des ports reseau, processus et services systemd en temps reel — local et multi-machines.**
 
-PortGuardian est une application de monitoring des ports reseau pour Linux, avec trois modes d'utilisation :
+PortGuardian est un outil de securite reseau pour Linux qui surveille les ports ouverts, identifie les programmes qui utilisent le reseau, bloque des ports ou des adresses IP, et permet de terminer des processus suspects — le tout depuis une interface unique.
 
-1. **TUI interactif** — interface terminal type htop (v1.0)
-2. **Agent daemon** — surveillance autonome avec notifications Slack/email/webhook (v0.2)
-3. **Serveur web** — dashboard centralise pour surveiller N machines depuis un navigateur (v0.2)
+Trois modes d'utilisation :
+- **TUI interactif** — interface terminal temps reel
+- **Agent daemon** — surveillance autonome avec notifications
+- **Serveur web** — dashboard centralise multi-machines
 
-Construite avec Python 3.12+, Textual, psutil et Flask.
+Construit avec Python 3.12+, Textual, psutil et Flask.
 
 ---
 
-## Captures d'ecran
+## Table des matieres
 
-### Vue principale — tableau des connexions
-
-![Vue principale](screenshots/screenshot_main.svg)
-
-### Statistiques globales (`t`)
-
-![Statistiques globales](screenshots/screenshot_stats.svg)
-
-### Alertes et regles de securite (`A`)
-
-![Alertes](screenshots/screenshot_alerts.svg)
-
-### Historique des evenements reseau (`h`)
-
-![Historique](screenshots/screenshot_history.svg)
+- [Installation](#installation)
+- [Utilisation](#utilisation)
+- [Fonctionnalites](#fonctionnalites)
+  - [Surveillance des ports ouverts/fermes](#surveillance-des-ports-ouvertsfermes)
+  - [Programmes utilisant le reseau](#programmes-utilisant-le-reseau)
+  - [Blocage de ports et d'adresses IP](#blocage-de-ports-et-dadresses-ip)
+  - [Terminer ou suspendre des processus](#terminer-ou-suspendre-des-processus)
+  - [Alertes et regles de securite](#alertes-et-regles-de-securite)
+  - [Baseline de securite](#baseline-de-securite)
+  - [Historique des evenements](#historique-des-evenements)
+  - [Statistiques systeme](#statistiques-systeme)
+  - [Recherche, tri et filtres](#recherche-tri-et-filtres)
+  - [Export des donnees](#export-des-donnees)
+  - [Integration systemd](#integration-systemd)
+  - [Dashboard web multi-machines](#dashboard-web-multi-machines)
+- [Raccourcis clavier](#raccourcis-clavier)
+- [Architecture](#architecture)
+- [Tests](#tests)
+- [FAQ](#faq)
+- [Licence](#licence)
 
 ---
 
@@ -40,22 +46,13 @@ Construite avec Python 3.12+, Textual, psutil et Flask.
 - **Linux** (Ubuntu 24.04+ recommande)
 - **systemd** (pour la gestion des services)
 
-### Avec venv (recommande)
+### Installation rapide
 
 ```bash
 git clone <url-du-depot>
 cd port_listen_script
 python3 -m venv venv
 venv/bin/pip install -r portguardian/requirements.txt
-```
-
-### Avec uv
-
-```bash
-git clone <url-du-depot>
-cd port_listen_script
-uv venv venv
-uv pip install -r portguardian/requirements.txt
 ```
 
 ### Dependances
@@ -71,221 +68,243 @@ uv pip install -r portguardian/requirements.txt
 
 ## Utilisation
 
-### Mode TUI interactif (recommande)
-
-Avec les privileges root, PortGuardian peut afficher tous les processus, PIDs, chemins d'executables et gerer les services systemd :
+PortGuardian se lance via un script unique `./portguardian` :
 
 ```bash
 cd portguardian/
-./run.sh
+
+# TUI interactif (necessite sudo)
+./portguardian
+
+# Scan unique des ports
+./portguardian scan --listen
+
+# Scan avec export JSON
+./portguardian scan --format json --output /tmp/ports.json
+
+# Lancer le serveur web
+./portguardian server --port 8600
+
+# Lancer l'agent daemon
+./portguardian agent run --server http://monitor:8600
+
+# Aide complete
+./portguardian help
 ```
 
-Le script `run.sh` localise automatiquement le venv adjacent (`../venv/`) et lance l'application avec `sudo`.
+### Commandes disponibles
 
-### Mode non-interactif (CLI)
+| Commande | Description |
+|----------|-------------|
+| `./portguardian` | Lance le TUI interactif (mode par defaut) |
+| `./portguardian tui` | Idem |
+| `./portguardian server [options]` | Lance le dashboard web |
+| `./portguardian agent <run\|once\|init>` | Lance l'agent daemon |
+| `./portguardian scan [options]` | Scan unique (CLI) |
+| `./portguardian help` | Affiche l'aide |
 
-```bash
-# Lister toutes les connexions (texte)
-python3 main.py --once
-
-# Lister uniquement les ports en ecoute
-python3 main.py --list-listen
-
-# Exporter en JSON sur stdout
-python3 main.py --once --format json
-
-# Exporter en CSV vers un fichier
-python3 main.py --once --format csv --output /tmp/ports.csv
-
-# Exporter en JSON vers un fichier
-python3 main.py --once --format json --output /var/log/ports.json
-```
-
-### Mode daemon (v0.2) — surveillance autonome
-
-L'agent tourne en arriere-plan, detecte les changements de ports, et notifie via Slack, email, ou webhook.
+### Deploiement multi-machines
 
 ```bash
-# Generer la configuration
-python3 -m daemon.cli init
+# Sur le serveur central :
+./portguardian server --port 8600 --api-key SECRET
 
-# Lancer un scan unique
-python3 -m daemon.cli once --json
+# Sur chaque machine a surveiller :
+./portguardian agent run --server http://serveur:8600 --api-key SECRET
 
-# Lancer l'agent en continu (toutes les 30s par defaut)
-python3 -m daemon.cli run --interval 30
-
-# Avec notifications Slack
-python3 -m daemon.cli run --slack https://hooks.slack.com/services/XXX/YYY/ZZZ
-
-# Avec push vers le serveur central
-python3 -m daemon.cli run --server http://monitoring.internal:8600 --api-key SECRET
-```
-
-Configuration : `~/.config/portguardian/daemon.json`
-
-#### Installation en service systemd
-
-```bash
+# Installer en service systemd (optionnel) :
 sudo cp daemon/portguardian-agent.service /etc/systemd/system/
-sudo systemctl daemon-reload
 sudo systemctl enable --now portguardian-agent
 ```
-
-### Mode serveur web (v0.2) — dashboard multi-machines
-
-Recoit les rapports des agents et expose un dashboard web temps reel.
-
-```bash
-# Lancer le serveur
-python3 -m server.cli --port 8600
-
-# Avec cle API obligatoire pour les agents
-python3 -m server.cli --port 8600 --api-key MY_SECRET_KEY
-```
-
-Puis ouvrir `http://localhost:8600` dans un navigateur.
-
-#### API REST du serveur
-
-| Endpoint                    | Methode | Description                    |
-|-----------------------------|---------|--------------------------------|
-| `/api/report`               | POST    | Reception des snapshots agents |
-| `/api/hosts`                | GET     | Liste des machines             |
-| `/api/hosts/<hostname>`     | GET     | Detail d'une machine           |
-| `/api/hosts/<hostname>/history` | GET | Historique d'une machine       |
-| `/api/events`               | GET     | Evenements globaux recents     |
-
-#### Installation en service systemd
-
-```bash
-sudo cp server/portguardian-server.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now portguardian-server
-```
-
----
-
-## Raccourcis clavier
-
-### Navigation principale
-
-| Touche   | Action                                           |
-|----------|--------------------------------------------------|
-| `q`      | Quitter l'application                            |
-| `r`      | Rafraichir manuellement les donnees              |
-| `/`      | Rechercher (port, PID, nom, user, protocole)     |
-| `s`      | Trier les connexions par colonne (asc/desc)      |
-| `e`      | Exporter les donnees (CSV / JSON / TXT)          |
-| `Escape` | Effacer le filtre actif / fermer le panneau      |
-| `Ctrl+P` | Sauvegarder un screenshot SVG dans `screenshots/` |
-
-### Securite et alertes
-
-| Touche | Action                                              |
-|--------|-----------------------------------------------------|
-| `A`    | Afficher les alertes actives et gerer les regles    |
-| `B`    | Capturer la baseline / afficher les deviations      |
-| `b`    | Bloquer / debloquer des ports (firewall)            |
-
-### Surveillance et statistiques
-
-| Touche | Action                                              |
-|--------|-----------------------------------------------------|
-| `h`    | Historique des evenements reseau (ouvertures, etc.) |
-| `t`    | Vue statistiques : top CPU/RAM, bande passante      |
-| `f`    | Filtres de recherche sauvegardes                    |
-
-### Gestion des processus
-
-| Touche | Action                                              |
-|--------|-----------------------------------------------------|
-| `k`    | Envoyer SIGTERM au processus selectionne            |
-| `K`    | Envoyer SIGKILL au processus selectionne            |
-| `p`    | Suspendre le processus selectionne (SIGSTOP)        |
-| `c`    | Reprendre le processus suspendu (SIGCONT)           |
-| `S`    | Ouvrir le menu de gestion du service systemd        |
 
 ---
 
 ## Fonctionnalites
 
-### Surveillance reseau en temps reel
+### Surveillance des ports ouverts/fermes
 
-- Rafraichissement automatique configurable (par defaut : 2 secondes)
-- Support complet **IPv4** et **IPv6**
-- Protocoles : **TCP**, **UDP**, **sockets Unix** (optionnel)
-- Tous les etats de connexion : LISTEN, ESTABLISHED, TIME_WAIT, CLOSE_WAIT, SYN_SENT, etc.
-- Colonne **Distant** avec resolution DNS inverse asynchrone (cache TTL 5 min)
-- Colonne **Trend** : sparkline ASCII `▁▂▃▄▅▆▇█` de l'historique CPU par processus
+Affiche en temps reel tous les ports TCP et UDP ouverts sur le systeme, avec les etats de connexion (LISTEN, ESTABLISHED, TIME_WAIT, CLOSE_WAIT, SYN_SENT, etc.), le support IPv4/IPv6, et la detection automatique des changements (nouveau port ouvert, port ferme).
 
-### Securite et alertes
+![Vue principale — tableau des connexions](screenshots/screenshot_main.svg)
 
-**Regles d'alerte configurables** (`A`)
-- Creation de regles avec conditions : port exact/range, protocole, processus (exact ou `*substring`), utilisateur, exclusions (`process_not`, `user_not`)
-- Severites : `critical`, `warning`, `info`
-- Persistees dans `~/.config/portguardian/rules.json`
-- Regles par defaut : SSH ecoute par un processus non-sshd, port < 1024 par un non-root
-- Notification automatique lors d'alertes critiques
+- Rafraichissement automatique configurable (defaut : 2 secondes)
+- Protocoles : TCP, UDP, sockets Unix
+- Deduplication intelligente des connexions
+- Resolution DNS inverse asynchrone avec cache TTL 5 min
+- Colonne Trend : sparkline ASCII de l'historique CPU par processus
 
-**Baseline snapshot** (`B`)
-- Premier appui : sauvegarde l'etat actuel dans `~/.local/share/portguardian/baseline.json`
-- Appuis suivants : affiche le nombre de connexions nouvelles / disparues
-- Les entrees absentes de la baseline sont surlignees en vert dans la table
+---
 
-**Gestion du firewall** (`b`)
-- Detection automatique du backend : **ufw** > **firewalld** > **nftables** > **iptables**
-- Blocage/deblocage de ports (simple, liste, plage : `80`, `80,443`, `8000-8100`)
+### Programmes utilisant le reseau
+
+Identifie quel processus possede chaque connexion : PID, nom du programme, utilisateur, CPU%, memoire, uptime, et adresses IP source/destination.
+
+![Vue principale — processus et connexions](screenshots/screenshot_main.svg)
+
+- Association processus ↔ connexion via psutil (necessite root)
+- Affichage des adresses locales et distantes avec port
+- Details complets d'un processus en selectionnant une ligne (PID, PPID, threads, ligne de commande, fichiers ouverts, variables d'environnement)
+- Bande passante par interface reseau (stats globales)
+
+---
+
+### Blocage de ports et d'adresses IP
+
+Bloque ou debloque des ports et des adresses IP directement depuis l'interface, avec detection automatique du backend firewall.
+
+- **Ports** (`b`) : blocage simple (`80`), liste (`80,443`), plage (`8000-8100`)
+- **IP** (`i`) : blocage d'adresses IPv4, IPv6, CIDR (`192.168.1.0/24`, `10.0.0.1,172.16.0.1`)
 - Protocoles : TCP, UDP, ou les deux
 - Direction : entrant, sortant, ou les deux
-- Persistance automatique des regles iptables (`iptables-save`)
+- 4 backends : ufw > firewalld > nftables > iptables (detection automatique)
+- Persistance automatique des regles
 
-### Historique des evenements (`h`)
+---
 
-- Liste scrollable de tous les changements detectes par le watcher
-- Affichage : timestamp, type d'evenement, protocole, port, processus
-- Historique circulaire (500 entrees maximum)
+### Terminer ou suspendre des processus
+
+Envoie des signaux aux processus directement depuis le tableau, avec confirmation obligatoire.
+
+| Touche | Signal | Effet |
+|--------|--------|-------|
+| `k` | SIGTERM | Arret propre du processus |
+| `K` | SIGKILL | Arret force immediat |
+| `p` | SIGSTOP | Suspension (pause) |
+| `c` | SIGCONT | Reprise du processus suspendu |
+
+- Dialogue de confirmation avant chaque action
+- Gestion des erreurs (processus deja mort, permission refusee)
+- Rafraichissement automatique apres le signal
+
+---
+
+### Alertes et regles de securite
+
+Systeme de regles d'alerte configurables pour detecter les situations suspectes.
+
+![Alertes et regles de securite](screenshots/screenshot_alerts.svg)
+
+- Creation de regles avec conditions : port exact/range, protocole, processus, utilisateur
+- Exclusions : `process_not`, `user_not`
+- Severites : `critical`, `warning`, `info`
+- Regles par defaut : SSH ecoute par un processus non-sshd, port < 1024 par un non-root
+- Notification automatique lors d'alertes critiques
+- Persistees dans `~/.config/portguardian/rules.json`
+
+---
+
+### Baseline de securite
+
+Capture un instantane de l'etat reseau pour detecter toute deviation ulterieure.
+
+- Premier appui sur `B` : sauvegarde de la baseline dans `~/.local/share/portguardian/baseline.json`
+- Appuis suivants : affiche le nombre de connexions nouvelles/disparues
+- Les connexions absentes de la baseline sont surlignees en vert dans le tableau
+
+---
+
+### Historique des evenements
+
+Journal scrollable de tous les changements reseau detectes automatiquement.
+
+![Historique des evenements](screenshots/screenshot_history.svg)
+
+- Types : port ouvert, port ferme, nouveau processus, processus termine
+- Affichage : timestamp, type, protocole, port, processus
+- Buffer circulaire de 500 entrees
 - Bouton "Vider" pour reinitialiser
 
-### Statistiques globales (`t`)
+---
 
-- Top 5 processus par CPU% avec barre de progression ASCII
-- Top 5 processus par RAM% avec barre de progression ASCII
+### Statistiques systeme
+
+Vue d'ensemble des ressources et de la bande passante.
+
+![Statistiques globales](screenshots/screenshot_stats.svg)
+
+- Top 5 processus par CPU% avec barres de progression
+- Top 5 processus par RAM%
 - Top processus par nombre de connexions
-- Bande passante en temps reel par interface reseau (↑ envoye / ↓ recu)
+- Bande passante temps reel par interface (envoye/recu)
 
-### Gestion des processus
+---
 
-- Affichage des details complets : PID, PPID, utilisateur, groupe, CPU%, RAM, threads, uptime, ligne de commande
-- Envoi de signaux avec confirmation : SIGTERM, SIGKILL, SIGSTOP, SIGCONT
-- Visualisation des fichiers ouverts et des variables d'environnement
+### Recherche, tri et filtres
+
+- Recherche (`/`) insensible a la casse sur tous les champs
+- Tri (`s`) par toutes les colonnes avec sens ascendant/descendant
+- **Filtres nommes et persistes** (`f`) dans `~/.config/portguardian/filters.json`
+
+---
+
+### Export des donnees
+
+Export des connexions en plusieurs formats depuis le TUI (`e`) ou en CLI.
+
+- Formats : CSV, JSON, TXT (texte tabule)
+- Champs : protocol, local_addr, local_port, remote_addr, remote_port, status, pid, process_name, username, cpu_percent, memory_percent, service, uptime
+- Fichiers horodates dans le repertoire `exports/`
+- Screenshots SVG de l'interface (`Ctrl+P`) dans `screenshots/`
+
+---
 
 ### Integration systemd
 
+Gestion des services systemd associes aux processus directement depuis l'interface (`S`).
+
 - Detection automatique du service associe a un processus
-- Actions disponibles : start, stop, restart, reload, status
-- Consultation des logs dans un ecran dedie scrollable (via journalctl)
+- Actions : start, stop, restart, reload, status
+- Consultation des logs (journalctl) dans un ecran dedie scrollable
 
-### Recherche et tri
+---
 
-- Recherche insensible a la casse sur tous les champs (port, PID, nom, user, protocole, adresse, etat)
-- **Filtres nommes et persistes** (`f`) dans `~/.config/portguardian/filters.json`
-- Tri par toutes les colonnes avec choix ascendant / descendant
+### Dashboard web multi-machines
 
-### Screenshots (`Ctrl+P`)
+Serveur web centralise qui recoit les rapports des agents et expose un dashboard temps reel.
 
-- Sauvegarde un screenshot SVG de l'ecran courant dans le repertoire `screenshots/`
-- Nommage automatique horodate : `PortGuardian_YYYY-MM-DD_HH-MM.svg`
-- Fonctionne correctement meme en mode `sudo` (contrairement au comportement par defaut de Textual qui ecrit dans `~/Telechargements` inaccessible en root)
-- Les SVG sont separes des exports de donnees (CSV/JSON/TXT)
-- Le fichier SVG peut etre ouvert dans un navigateur ou converti en PNG avec `rsvg-convert` ou Inkscape
+- Vue d'ensemble : nombre de machines, connexions totales, ports en ecoute, evenements
+- Detail par machine : ports en ecoute, connexions, evenements, bande passante
+- Page evenements dediee avec filtrage
+- Auto-refresh toutes les 15 secondes
+- Theme dark
+- Section "Deployer un agent" avec commandes copiables
+- API REST pour integration
 
-### Export des donnees (`e`)
+#### API REST
 
-- Formats supportes : **CSV**, **JSON**, **TXT** (texte tabule)
-- Champs exportes : protocol, local_addr, local_port, remote_addr, remote_port, status, pid, process_name, username, **cpu_percent**, **memory_percent**, **service**, **uptime**
-- Fichiers horodates dans le repertoire `exports/`
-- Egalement disponible en mode CLI avec `--format` et `--output`
+| Endpoint | Methode | Description |
+|----------|---------|-------------|
+| `/api/report` | POST | Reception des snapshots agents |
+| `/api/hosts` | GET | Liste des machines |
+| `/api/hosts/<hostname>` | GET | Detail d'une machine |
+| `/api/hosts/<hostname>/history` | GET | Historique d'une machine |
+| `/api/events` | GET | Evenements globaux recents |
+
+---
+
+## Raccourcis clavier
+
+| Touche | Action |
+|--------|--------|
+| `q` | Quitter |
+| `r` | Rafraichir manuellement |
+| `/` | Rechercher |
+| `s` | Trier par colonne |
+| `e` | Exporter (CSV/JSON/TXT) |
+| `Escape` | Effacer le filtre / fermer |
+| `Ctrl+P` | Screenshot SVG |
+| `A` | Alertes et regles |
+| `B` | Baseline |
+| `b` | Bloquer/debloquer des ports |
+| `i` | Bloquer/debloquer des IPs |
+| `h` | Historique des evenements |
+| `t` | Statistiques |
+| `f` | Filtres sauvegardes |
+| `k` | SIGTERM |
+| `K` | SIGKILL |
+| `p` | Suspendre (SIGSTOP) |
+| `c` | Reprendre (SIGCONT) |
+| `S` | Menu service systemd |
 
 ---
 
@@ -293,173 +312,90 @@ sudo systemctl enable --now portguardian-server
 
 ```
 portguardian/
-├── run.sh                      # Script de lancement (trouve le venv, lance avec sudo)
-├── main.py                     # Point d'entree — TUI interactif ou CLI (argparse)
-├── app.py                      # Application Textual principale (bindings, workers)
-├── config.py                   # Configuration centralisee (intervalles, chemins XDG)
-├── pyproject.toml              # Metadonnees et dependances
-├── requirements.txt            # Dependances pip
+├── portguardian                # Script d'entree unique (bash)
+├── main.py                     # Point d'entree Python (TUI + CLI)
+├── app.py                      # Application Textual (bindings, workers)
+├── config.py                   # Configuration centralisee
 ├── core/                       # Logique metier
-│   ├── ports.py                # Collecte des connexions reseau (TCP/UDP/IPv4/IPv6/Unix)
-│   ├── process.py              # Informations detaillees sur les processus psutil
-│   ├── services.py             # Detection et gestion des services systemd
-│   ├── search.py               # Moteur de recherche et tri des connexions
-│   ├── exporter.py             # Export horodate (CSV, JSON, TXT) avec metriques
-│   ├── watcher.py              # Surveillance des changements reseau (deque cap 500)
-│   ├── firewall.py             # Backend firewall multi-plateforme (ufw/firewalld/nft/iptables)
-│   ├── alerts.py               # Moteur de regles d'alerte configurables
-│   ├── baseline.py             # Snapshot baseline et detection de deviations
-│   ├── dns_cache.py            # Resolution DNS inverse asynchrone avec cache TTL
-│   ├── bandwidth.py            # Suivi de la bande passante par interface
-│   ├── sparkline.py            # Historique circulaire et rendu sparkline ASCII
-│   ├── filters.py              # Filtres de recherche nommes et persistes
+│   ├── ports.py                # Collecte des connexions reseau
+│   ├── process.py              # Informations processus (psutil)
+│   ├── services.py             # Detection et gestion systemd
+│   ├── search.py               # Moteur de recherche et tri
+│   ├── exporter.py             # Export (CSV, JSON, TXT)
+│   ├── watcher.py              # Detection des changements reseau
+│   ├── firewall.py             # Blocage ports + IP (ufw/firewalld/nft/iptables)
+│   ├── alerts.py               # Moteur de regles d'alerte
+│   ├── baseline.py             # Snapshot et detection de deviations
+│   ├── dns_cache.py            # Resolution DNS inverse async + cache
+│   ├── bandwidth.py            # Bande passante par interface
+│   ├── sparkline.py            # Sparklines ASCII
+│   ├── filters.py              # Filtres de recherche persistes
 │   ├── permissions.py          # Verification des privileges root
-│   └── logs.py                 # Configuration du logging applicatif
-├── daemon/                     # Agent autonome (v0.2)
-│   ├── agent.py                # Collecte periodique + detection de changements
-│   ├── config.py               # Configuration daemon (JSON)
-│   ├── notifier.py             # Notifications multi-canal (Slack, email, webhook)
-│   ├── cli.py                  # CLI du daemon (run, once, init)
-│   └── portguardian-agent.service  # Fichier systemd
-├── server/                     # Serveur web centralise (v0.2)
+│   └── logs.py                 # Logging applicatif
+├── daemon/                     # Agent autonome
+│   ├── agent.py                # Collecte periodique + detection
+│   ├── config.py               # Configuration daemon
+│   ├── notifier.py             # Notifications (Slack, email, webhook)
+│   └── cli.py                  # CLI du daemon
+├── server/                     # Serveur web
 │   ├── app.py                  # API Flask + dashboard
 │   ├── cli.py                  # CLI du serveur
-│   ├── portguardian-server.service # Fichier systemd
-│   ├── templates/              # Templates HTML Jinja2
-│   │   ├── dashboard.html      # Vue d'ensemble multi-machines
-│   │   └── host.html           # Detail d'une machine
-│   └── static/
-│       └── style.css           # Theme dark GitHub-style
-├── ui/                         # Composants de l'interface TUI
-│   ├── dashboard.py            # Layout principal du tableau de bord
-│   ├── tables.py               # Tableau interactif (sparkline, DNS, baseline highlight)
-│   ├── details.py              # Panneau de details d'un processus
-│   ├── dialogs.py              # Dialogues modaux (recherche, tri+sens, export, service, firewall, logs)
-│   ├── history_screen.py       # Ecran historique des evenements reseau
-│   ├── stats_screen.py         # Ecran statistiques globales et bande passante
-│   ├── alerts_screen.py        # Ecran alertes actives et gestion des regles
-│   ├── header.py               # En-tete systeme (CPU, RAM, connexions, LISTEN)
-│   └── footer.py               # Pied de page avec tous les raccourcis
-├── utils/                      # Utilitaires
-│   ├── formatter.py            # Formatage des valeurs pour l'affichage
-│   ├── helpers.py              # format_bytes, format_duration, etc.
-│   ├── colors.py               # Palette de couleurs par etat/protocole
-│   └── icons.py                # Icones et symboles unicode
-├── tests/                      # Tests unitaires (289 tests)
-│   ├── test_alerts.py          # AlertRule matching, AlertEngine evaluation
-│   ├── test_baseline.py        # save/load baseline, get_deviations
-│   ├── test_bandwidth.py       # BandwidthMonitor rate calculation
-│   ├── test_cli.py             # Mode CLI (--once, --list-listen, --format, --output)
-│   ├── test_dns_cache.py       # Cache DNS, TTL, resolution async
-│   ├── test_export.py          # Export CSV/JSON/TXT avec les nouveaux champs
-│   ├── test_filters.py         # FilterStore CRUD et persistance
-│   ├── test_firewall.py        # parse_port_spec
-│   ├── test_ports.py           # get_all_connections, protocols, deduplication
-│   ├── test_process.py         # ProcessDetail, get_process_detail
-│   ├── test_search.py          # filter_connections
-│   ├── test_sort.py            # sort_connections par toutes les colonnes
-│   ├── test_sparkline.py       # MetricHistory, HistoryStore, sparkline rendering
-│   └── test_watcher.py         # NetworkWatcher event detection, history cap
-├── exports/                    # Fichiers exportes (CSV/JSON/TXT horodates)
-├── screenshots/                # Screenshots SVG (Ctrl+P)
-└── logs/                       # Logs applicatifs (application.log)
+│   ├── templates/              # Templates HTML (dashboard, host, events)
+│   └── static/style.css        # Theme dark
+├── ui/                         # Composants TUI
+│   ├── dashboard.py            # Layout principal
+│   ├── tables.py               # Tableau interactif
+│   ├── details.py              # Panneau de details processus
+│   ├── dialogs.py              # Dialogues modaux (recherche, tri, export, firewall, IP)
+│   ├── history_screen.py       # Ecran historique
+│   ├── stats_screen.py         # Ecran statistiques
+│   ├── alerts_screen.py        # Ecran alertes
+│   ├── header.py               # En-tete systeme
+│   └── footer.py               # Pied de page raccourcis
+├── utils/                      # Utilitaires (formatage, couleurs, icones)
+├── tests/                      # 289 tests unitaires
+├── exports/                    # Fichiers exportes
+├── screenshots/                # Screenshots SVG
+└── logs/                       # Logs applicatifs
 ```
 
-### Fichiers de configuration utilisateur (XDG)
+### Configuration utilisateur (XDG)
 
-| Fichier                                              | Contenu                        |
-|------------------------------------------------------|--------------------------------|
-| `~/.config/portguardian/rules.json`                  | Regles d'alerte                |
-| `~/.config/portguardian/filters.json`                | Filtres de recherche nommes    |
-| `~/.config/portguardian/daemon.json`                 | Configuration de l'agent daemon |
-| `~/.local/share/portguardian/baseline.json`          | Snapshot baseline              |
-| `~/.local/share/portguardian/daemon/latest.json`     | Dernier snapshot de l'agent    |
-| `~/.local/share/portguardian/daemon/history/`        | Historique des snapshots       |
+| Fichier | Contenu |
+|---------|---------|
+| `~/.config/portguardian/rules.json` | Regles d'alerte |
+| `~/.config/portguardian/filters.json` | Filtres de recherche |
+| `~/.config/portguardian/daemon.json` | Configuration agent |
+| `~/.local/share/portguardian/baseline.json` | Snapshot baseline |
+| `~/.local/share/portguardian/daemon/latest.json` | Dernier snapshot agent |
 
 ---
 
 ## Tests
 
 ```bash
-cd portguardian/
-../venv/bin/python3 -m pytest tests/ -v
+./portguardian scan --listen  # test rapide
+../venv/bin/python3 -m pytest tests/ -v  # suite complete (289 tests)
 ```
-
-289 tests couvrant : collecte reseau, recherche/tri, export, firewall, alertes, baseline, sparklines, filtres, watcher, DNS cache, bande passante, mode CLI.
 
 ---
 
 ## FAQ
 
-### Pourquoi certains processus affichent un PID vide ?
+**Pourquoi certains processus affichent un PID vide ?**
+Sans `sudo`, le systeme ne permet pas de voir les processus d'autres utilisateurs.
 
-Sans privileges root, le systeme ne permet pas d'acceder aux informations de processus appartenant a d'autres utilisateurs. Lancez avec `sudo` pour un acces complet.
+**Quel backend firewall est utilise ?**
+Detection automatique : ufw > firewalld > nftables > iptables.
 
-### Quel backend firewall est utilise ?
-
-PortGuardian detecte automatiquement dans l'ordre : ufw, firewalld, nftables, iptables. Le backend actif est journalise au demarrage.
-
-### Le screenshot ne fonctionne pas / "Failed to save screenshot" ?
-
-L'app tourne en `sudo` (root), mais Textual par defaut essaie d'ecrire dans `~/Telechargements` qui appartient a l'utilisateur normal. PortGuardian contourne ce probleme avec `Ctrl+P` qui sauvegarde directement dans `exports/` (repertoire du projet, accessible en root). Evitez d'utiliser le raccourci `Ctrl+S` de Textual.
-
-### Comment creer une regle d'alerte ?
-
-Appuyez sur `A` pour ouvrir la vue alertes, puis sur `n` (ou le bouton "+ Regle") pour ouvrir le formulaire de creation. Les regles sont sauvegardees automatiquement dans `~/.config/portguardian/rules.json`.
-
-### Comment utiliser la baseline ?
-
-Appuyez sur `B` une premiere fois pour capturer l'etat actuel. Ensuite, toute connexion absente de la baseline sera surlignee en vert dans la table. Un nouvel appui sur `B` affiche le nombre de deviations detectees.
-
-### Quels systemes d'exploitation sont supportes ?
-
-PortGuardian est concu pour **Linux** avec systemd. Il est teste sur Ubuntu 24.04+. La gestion des services systemd n'est pas disponible sur macOS ou Windows.
-
-### Le rafraichissement est-il configurable ?
-
-Oui, modifiez les constantes dans `config.py` :
-
-```python
-REFRESH_INTERVAL: float = 2.0   # Intervalle de rafraichissement de l'interface (secondes)
-WATCHER_INTERVAL: float = 1.0   # Intervalle de surveillance des changements reseau
-```
-
-### Comment ajouter PortGuardian au PATH ?
+**Comment ajouter PortGuardian au PATH ?**
 
 ```bash
-# Alias dans ~/.bashrc ou ~/.zshrc
-alias portguardian='/chemin/vers/portguardian/run.sh'
-
-# Lien symbolique
-sudo ln -s /chemin/vers/portguardian/run.sh /usr/local/bin/portguardian
+sudo ln -s /chemin/vers/portguardian/portguardian /usr/local/bin/portguardian
 ```
 
 ---
 
 ## Licence
 
-Ce projet est distribue sous licence **MIT**.
-
-```
-MIT License
-
-Copyright (c) 2024 PortGuardian Team
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
+MIT License — Copyright (c) 2024 PortGuardian Team

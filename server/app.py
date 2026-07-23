@@ -127,7 +127,22 @@ def dashboard():
             })
         recent_events = _events[-20:]
 
-    return render_template("dashboard.html", hosts=hosts, events=reversed(recent_events))
+    return render_template("dashboard.html", hosts=hosts, events=reversed(recent_events), api_key=API_KEY)
+
+
+@app.route("/events")
+def events_page():
+    """Page HTML des evenements."""
+    with _lock:
+        all_events = list(reversed(_events[-100:]))
+        hosts_list = list(_hosts.keys())
+
+    return render_template(
+        "events.html",
+        events=all_events,
+        hosts_list=hosts_list,
+        hosts_count=len(hosts_list),
+    )
 
 
 @app.route("/host/<hostname>")

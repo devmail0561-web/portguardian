@@ -33,9 +33,9 @@ from ui.tables import ConnectionsTable
 from ui.details import ProcessDetailsPanel
 from ui.dialogs import (
     ConfirmDialog, SearchDialog, SortDialog, ExportDialog, ServiceDialog,
-    BlockPortDialog, LogScreen,
+    BlockPortDialog, BlockIPDialog, LogScreen,
 )
-from core.firewall import block_ports, unblock_ports, is_firewall_available
+from core.firewall import block_ports, unblock_ports, block_ip, unblock_ip, is_firewall_available
 
 
 def _collect_process_metrics(
@@ -83,6 +83,7 @@ class PortGuardianApp(App):
         ("c", "resume", "Reprendre"),
         ("S", "service_menu", "Service"),
         ("b", "block_ports", "Bloquer ports"),
+        ("i", "block_ip", "Bloquer IP"),
         ("h", "history", "Historique"),
         ("t", "stats", "Stats"),
         ("A", "alerts", "Alertes"),
@@ -465,6 +466,43 @@ Screen {
                 self._trigger_refresh()
 
         self.push_screen(BlockPortDialog(prefill=prefill), on_result)
+
+    def action_block_ip(self) -> None:
+        if not is_firewall_available():
+            self.notify("Aucun backend firewall disponible (iptables/nft/ufw/firewalld)", severity="error", timeout=4)
+            return
+
+        table = self.query_one("#connections-table", ConnectionsTable)
+        conn = table.get_selected_connection()
+        prefill = conn.remote_addr if conn and conn.remote_addr else ""
+
+        def on_result(result: dict | None) -> None:
+            if not result:
+                return
+            spec = result.get("spec", "").strip()
+            if not spec:
+                self.notify("Aucune IP saisie", severity="warning", timeout=3)
+                return
+            action = result["action"]
+            direction = result["direction"]
+
+            if action == "block":
+                ok, msg = block_ip(spec, direction)
+            else:
+                ok, msg = unblock_ip(spec, direction)
+
+            severity = "information" if ok else "error"
+            verb = "Bloqué" if action == "block" else "Débloqué"
+            self.notify(
+                f"{verb} IP [{spec}] dir={direction}: {msg}",
+                severity=severity,
+                timeout=6,
+            )
+            logger.info("%s IP %s dir=%s: %s", verb, spec, direction, msg)
+            if ok:
+                self._trigger_refresh()
+
+        self.push_screen(BlockIPDialog(prefill=prefill), on_result)
 
     def action_history(self) -> None:
         """Affiche l'historique des événements réseau."""

@@ -1,0 +1,139 @@
+#!/bin/bash
+# PortGuardian — point d'entree unique
+# Usage:
+#   portguardian                     Lance le TUI interactif (sudo)
+#   portguardian tui                 Idem
+#   portguardian server [OPTIONS]    Lance le serveur web/dashboard
+#   portguardian agent [OPTIONS]     Lance l'agent daemon
+#   portguardian scan [OPTIONS]      Scan unique (CLI)
+#   portguardian help                Affiche cette aide
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Trouver le Python du venv
+if [ -x "$SCRIPT_DIR/../venv/bin/python3" ]; then
+    PYTHON="$SCRIPT_DIR/../venv/bin/python3"
+elif [ -x "$SCRIPT_DIR/venv/bin/python3" ]; then
+    PYTHON="$SCRIPT_DIR/venv/bin/python3"
+elif command -v python3 &>/dev/null; then
+    PYTHON="python3"
+else
+    echo "Erreur: Python 3 introuvable."
+    echo "Creez un venv: python3 -m venv venv && venv/bin/pip install -r requirements.txt"
+    exit 1
+fi
+
+show_help() {
+    cat <<'EOF'
+PortGuardian — surveillance des ports reseau, processus et services
+
+Usage: portguardian <commande> [options]
+
+Commandes:
+  tui                   Interface terminal interactive (defaut, necessite sudo)
+  server                Lancer le serveur web / dashboard centralise
+  agent                 Lancer l'agent daemon (surveillance autonome)
+  scan                  Scan unique des connexions (sortie texte/json/csv)
+  help                  Afficher cette aide
+
+----------------------------------------------------------------------
+portguardian tui
+  Lance l'interface TUI avec sudo. Tous les arguments supplementaires
+  sont passes a main.py.
+
+----------------------------------------------------------------------
+portguardian server [options]
+  --host HOST           Adresse d'ecoute (defaut: 0.0.0.0)
+  -p, --port PORT       Port (defaut: 8600)
+  --api-key KEY         Cle API requise pour les agents
+  --debug               Mode debug Flask
+
+----------------------------------------------------------------------
+portguardian agent <sous-commande> [options]
+  Sous-commandes: run, once, init
+
+  run [options]         Lancer l'agent en continu
+    -i, --interval SEC    Intervalle en secondes (defaut: 30)
+    --server URL          URL du serveur central
+    --api-key KEY         Cle API du serveur
+    --slack URL           Webhook Slack
+    --webhook URL         Webhook generique
+    --hostname NAME       Nom d'hote personnalise
+
+  once [options]        Scan unique
+    --json                Sortie JSON
+    --server URL          Pousser vers le serveur central
+    --api-key KEY         Cle API
+
+  init                  Generer la configuration par defaut
+
+----------------------------------------------------------------------
+portguardian scan [options]
+  --format FORMAT       Format de sortie: json, csv, txt (defaut: texte)
+  --output FILE         Ecrire dans un fichier au lieu de stdout
+  --listen              Afficher uniquement les ports en ecoute
+
+----------------------------------------------------------------------
+Exemples:
+  portguardian                                    # TUI interactif
+  portguardian server --port 8600 --api-key SECRET
+  portguardian agent run --server http://monitor:8600 --interval 30
+  portguardian scan --listen
+  portguardian scan --format json --output /tmp/ports.json
+EOF
+}
+
+CMD="${1:-tui}"
+
+case "$CMD" in
+    tui)
+        shift 2>/dev/null || true
+        exec sudo "$PYTHON" "$SCRIPT_DIR/main.py" "$@"
+        ;;
+    server)
+        shift
+        exec "$PYTHON" -m server.cli "$@"
+        ;;
+    agent|daemon)
+        shift
+        exec "$PYTHON" -m daemon.cli "$@"
+        ;;
+    scan)
+        shift
+        # Translate scan-specific flags to main.py flags
+        ARGS=("--once")
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --listen)
+                    ARGS=("--list-listen")
+                    shift
+                    ;;
+                --format)
+                    ARGS+=("--format" "$2")
+                    shift 2
+                    ;;
+                --output)
+                    ARGS+=("--output" "$2")
+                    shift 2
+                    ;;
+                *)
+                    ARGS+=("$1")
+                    shift
+                    ;;
+            esac
+        done
+        exec "$PYTHON" "$SCRIPT_DIR/main.py" "${ARGS[@]}"
+        ;;
+    help|--help|-h)
+        show_help
+        exit 0
+        ;;
+    *)
+        echo "Commande inconnue: $CMD"
+        echo ""
+        show_help
+        exit 1
+        ;;
+esac

@@ -40,7 +40,7 @@
                         </a>
                     </li>
                     <li>
-                        <a href="/api/events">
+                        <a href="/events">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                             Evenements
                             {% if events %}<span class="nav-badge danger">{{ events|list|length }}</span>{% endif %}
@@ -60,23 +60,6 @@
                         </a>
                     </li>
                     {% endfor %}
-                </ul>
-            </div>
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">API</div>
-                <ul class="sidebar-nav">
-                    <li>
-                        <a href="/api/hosts">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                            /api/hosts
-                        </a>
-                    </li>
-                    <li>
-                        <a href="/api/events">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                            /api/events
-                        </a>
-                    </li>
                 </ul>
             </div>
         </aside>
@@ -186,9 +169,50 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                     <h3>Aucun agent connecte</h3>
                     <p>Deployez l'agent PortGuardian sur vos machines pour commencer la surveillance.</p>
-                    <code>portguardian-daemon run --server http://{{ request.host }}</code>
                 </div>
                 {% endif %}
+            </div>
+
+            <!-- Deploy section -->
+            <div class="table-container">
+                <div class="table-header">
+                    <div>
+                        <span class="table-title">Deployer un agent</span>
+                        <span class="table-count">Instructions pour ajouter une machine</span>
+                    </div>
+                </div>
+                <div class="deploy-section">
+                    <div class="deploy-step">
+                        <span class="deploy-step-num">1</span>
+                        <div class="deploy-step-content">
+                            <div class="deploy-step-title">Cloner et installer sur la machine cible</div>
+                            <div class="deploy-code-block">
+                                <code id="deploy-cmd-1">git clone &lt;url-du-depot&gt; &amp;&amp; cd port_listen_script &amp;&amp; python3 -m venv venv &amp;&amp; venv/bin/pip install -r portguardian/requirements.txt</code>
+                                <button class="deploy-copy-btn" onclick="copyCmd('deploy-cmd-1')">Copier</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="deploy-step">
+                        <span class="deploy-step-num">2</span>
+                        <div class="deploy-step-content">
+                            <div class="deploy-step-title">Lancer l'agent avec connexion a ce serveur</div>
+                            <div class="deploy-code-block">
+                                <code id="deploy-cmd-2">./portguardian agent run --server http://{{ request.host }}{% if api_key %} --api-key {{ api_key }}{% endif %}</code>
+                                <button class="deploy-copy-btn" onclick="copyCmd('deploy-cmd-2')">Copier</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="deploy-step">
+                        <span class="deploy-step-num">3</span>
+                        <div class="deploy-step-content">
+                            <div class="deploy-step-title">(Optionnel) Installer en service systemd pour demarrage automatique</div>
+                            <div class="deploy-code-block">
+                                <code id="deploy-cmd-3">sudo cp daemon/portguardian-agent.service /etc/systemd/system/ &amp;&amp; sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable --now portguardian-agent</code>
+                                <button class="deploy-copy-btn" onclick="copyCmd('deploy-cmd-3')">Copier</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Events -->
@@ -232,6 +256,17 @@
                 document.querySelectorAll('#hosts-table tbody tr').forEach(row => {
                     row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
                 });
+            });
+        }
+
+        // Copy deploy commands
+        function copyCmd(id) {
+            const el = document.getElementById(id);
+            const text = el.textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = el.parentElement.querySelector('.deploy-copy-btn');
+                btn.textContent = 'Copie !';
+                setTimeout(() => { btn.textContent = 'Copier'; }, 2000);
             });
         }
 

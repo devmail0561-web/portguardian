@@ -44,7 +44,6 @@ class NetworkWatcher:
         self._on_event = on_event
         self._running = False
         self._history: deque[NetworkEvent] = deque(maxlen=HISTORY_MAXLEN)
-        self._prev_count: int = -1
 
     @property
     def history(self) -> list[NetworkEvent]:
@@ -66,9 +65,6 @@ class NetworkWatcher:
             return events
 
         current_count = len(current_connections)
-        if self._previous_state and current_count == self._prev_count:
-            return events
-        self._prev_count = current_count
 
         current_state: dict[tuple, ConnectionInfo] = {}
         for conn in current_connections:
