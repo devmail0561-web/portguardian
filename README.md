@@ -34,6 +34,7 @@ Construit avec Python 3.12+, Textual, psutil et Flask.
 - [Architecture](#architecture)
 - [Tests](#tests)
 - [FAQ](#faq)
+- [Changelog](#changelog)
 - [Licence](#licence)
 
 ---
@@ -393,6 +394,49 @@ Detection automatique : ufw > firewalld > nftables > iptables.
 ```bash
 sudo ln -s /chemin/vers/portguardian/portguardian /usr/local/bin/portguardian
 ```
+
+---
+
+## Changelog
+
+### v0.3
+
+- **Blocage d'adresses IP** — nouvelle fonctionnalite : blocage/deblocage d'IPs (IPv4, IPv6, CIDR) via touche `i`, support des 4 backends firewall
+- **Script unifie `./portguardian`** — remplace les multiples commandes `python3 -m ...` par un point d'entree unique (tui, server, agent, scan, help)
+- **Corrections firewall** — fix iptables `--dport` sur OUTPUT, fix syntaxe rich rule firewalld, fix match exact nftables, fix deblocage bidirectionnel ufw
+- **Persistance nftables** — les regles sont sauvegardees dans `/etc/nftables.d/portguardian.nft` pour survivre au reboot
+- **Fix watcher** — suppression du raccourci par comptage qui masquait les changements simultanes (port ouvert + port ferme en meme temps)
+- **Page evenements web** — nouveau template HTML `/events` (la navigation ne renvoie plus de JSON)
+- **Section deploiement** — instructions de deploiement d'agent avec commandes copiables dans le dashboard
+- **Sidebar nettoyee** — suppression des liens API bruts de la navigation
+- **README refait** — table des matieres, screenshots par fonctionnalite, commandes unifiees
+
+### v0.2
+
+- **Mode daemon** — agent autonome qui tourne en arriere-plan, detecte les changements de ports, et notifie via Slack, email ou webhook
+- **Serveur web** — dashboard Flask centralise pour surveiller N machines depuis un navigateur
+- **API REST** — endpoints pour recevoir les snapshots agents, lister les machines, consulter l'historique
+- **Multi-machines** — architecture agent/serveur pour deploiement sur plusieurs machines
+- **Notifications** — support Slack webhook, email, webhook generique
+- **Service systemd** — fichiers `.service` pour agent et serveur
+- **Configuration daemon** — fichier JSON (`~/.config/portguardian/daemon.json`) pour parametrer l'agent
+
+### v0.1
+
+- **TUI interactif** — interface terminal temps reel type htop avec Textual
+- **Surveillance des ports** — collecte TCP/UDP, IPv4/IPv6, tous etats de connexion
+- **Detection des changements** — watcher avec historique circulaire (500 entrees)
+- **Gestion des processus** — SIGTERM, SIGKILL, SIGSTOP, SIGCONT avec confirmation
+- **Blocage de ports** — support ufw, firewalld, nftables, iptables
+- **Alertes configurables** — regles avec conditions, severites, persistance JSON
+- **Baseline de securite** — snapshot + detection de deviations
+- **Statistiques** — top CPU/RAM, bande passante par interface
+- **Recherche et tri** — recherche multi-champs, tri par colonne, filtres persistes
+- **Export** — CSV, JSON, TXT avec metriques (cpu, ram, service, uptime)
+- **Integration systemd** — start/stop/restart/logs des services associes
+- **Resolution DNS** — reverse DNS asynchrone avec cache TTL
+- **Sparklines** — historique CPU par processus en caracteres ASCII
+- **Screenshots** — export SVG de l'interface (`Ctrl+P`)
 
 ---
 
