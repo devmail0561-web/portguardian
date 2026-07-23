@@ -38,16 +38,28 @@ from ui.dialogs import (
 from core.firewall import block_ports, unblock_ports, is_firewall_available
 
 
+_proc_cache: dict[int, psutil.Process] = {}
+
+
 def _collect_process_metrics(
     pids: set[int],
 ) -> tuple[dict[int, float], dict[int, float], dict[int, str]]:
+    global _proc_cache
     cpu_map: dict[int, float] = {}
     memory_map: dict[int, float] = {}
     uptime_map: dict[int, str] = {}
     now = time.time()
+
+    dead_pids = set(_proc_cache.keys()) - pids
+    for pid in dead_pids:
+        del _proc_cache[pid]
+
     for pid in pids:
         try:
-            proc = psutil.Process(pid)
+            if pid not in _proc_cache:
+                _proc_cache[pid] = psutil.Process(pid)
+                _proc_cache[pid].cpu_percent(interval=None)
+            proc = _proc_cache[pid]
             with proc.oneshot():
                 cpu_map[pid] = proc.cpu_percent(interval=None)
                 memory_map[pid] = proc.memory_percent()
@@ -59,6 +71,7 @@ def _collect_process_metrics(
                 else:
                     uptime_map[pid] = f"{int(uptime_secs // 60)}m"
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            _proc_cache.pop(pid, None)
             cpu_map[pid] = 0.0
             memory_map[pid] = 0.0
             uptime_map[pid] = "-"
