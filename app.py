@@ -111,6 +111,20 @@ Screen {
     layout: vertical;
 }
 
+Button {
+    height: 1;
+    min-width: 10;
+    padding: 0 2;
+    margin: 0 1;
+    text-align: center;
+    content-align: center middle;
+    border: none;
+}
+
+Button:hover {
+    text-style: bold;
+}
+
 #permission-warning {
     height: auto;
     padding: 0 2;
