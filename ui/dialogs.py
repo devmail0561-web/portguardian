@@ -38,12 +38,12 @@ class ConfirmDialog(ModalScreen[bool]):
 
     #confirm-buttons {
         align: center middle;
-        height: 3;
+        height: 1;
     }
 
     #confirm-buttons Button {
-        margin: 0 2;
-        min-width: 14;
+        margin: 0 1;
+        min-width: 12;
     }
     """
 
@@ -101,12 +101,12 @@ class SearchDialog(ModalScreen[str | None]):
 
     #search-buttons {
         align: center middle;
-        height: 3;
+        height: 1;
     }
 
     #search-buttons Button {
-        margin: 0 2;
-        min-width: 14;
+        margin: 0 1;
+        min-width: 12;
     }
     """
 
@@ -168,13 +168,13 @@ class SortDialog(ModalScreen):
 
     #sort-buttons {
         align: center middle;
-        height: 3;
+        height: 1;
         margin-top: 1;
     }
 
     #sort-buttons Button {
-        margin: 0 2;
-        min-width: 14;
+        margin: 0 1;
+        min-width: 12;
     }
     """
 
@@ -245,7 +245,7 @@ class ExportDialog(ModalScreen[str]):
 
     #export-buttons {
         align: center middle;
-        height: auto;
+        height: 1;
         margin-top: 1;
     }
 
@@ -305,7 +305,7 @@ class ServiceDialog(ModalScreen[str]):
 
     #service-buttons {
         align: center middle;
-        height: auto;
+        height: 1;
         margin-bottom: 1;
     }
 
@@ -390,13 +390,13 @@ class BlockPortDialog(ModalScreen[dict | None]):
 
     #block-buttons {
         align: center middle;
-        height: 3;
+        height: 1;
         margin-top: 1;
     }
 
     #block-buttons Button {
         margin: 0 1;
-        min-width: 14;
+        min-width: 12;
     }
     """
 
@@ -521,13 +521,13 @@ class BlockIPDialog(ModalScreen[dict | None]):
 
     #blockip-buttons {
         align: center middle;
-        height: 3;
+        height: 1;
         margin-top: 1;
     }
 
     #blockip-buttons Button {
         margin: 0 1;
-        min-width: 14;
+        min-width: 12;
     }
     """
 
