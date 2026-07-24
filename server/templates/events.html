@@ -1,173 +1,117 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PortGuardian — Evenements</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
-    <meta name="csrf-token" content="{{ csrf_token }}">
-</head>
-<body>
-    <div class="app-layout">
-        <!-- Top bar -->
-        <nav class="topbar">
-            <div class="topbar-brand">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-                <h1>PortGuardian<span>v{{ version }}</span></h1>
-            </div>
-            <div class="topbar-right">
-                <div class="refresh-indicator">
-                    <span class="dot"></span>
-                    <span>Live</span>
-                </div>
-                <span class="topbar-time" id="clock"></span>
-                <a href="/firewall" class="nav-link">Firewall</a>
-                <a href="/audit" class="nav-link">Audit</a>
-                <a href="/logout" class="nav-link logout">Logout</a>
-            </div>
-        </nav>
+{% extends "base.html" %}
+{% block title %}Evenements{% endblock %}
 
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Monitoring</div>
-                <ul class="sidebar-nav">
-                    <li>
-                        <a href="/">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-                            Dashboard
-                        </a>
-                    </li>
-                    <li>
-                        <a href="/events" class="active">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                            Evenements
-                            {% if events %}<span class="nav-badge danger">{{ events|length }}</span>{% endif %}
-                        </a>
-                    </li>
-                </ul>
-            </div>
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Machines ({{ hosts_count }})</div>
-                <ul class="sidebar-nav">
-                    {% for h in hosts_list %}
-                    <li>
-                        <a href="/host/{{ h }}">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                            {{ h }}
-                        </a>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </aside>
+{% block sidebar_extra %}
+<div class="sidebar-section">
+    <div class="sidebar-section-title">Machines ({{ hosts_count }})</div>
+    <ul class="sidebar-nav">
+        {% for h in hosts_list %}
+        <li>
+            <a href="/host/{{ h }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                {{ h }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}
 
-        <!-- Main -->
-        <main class="main-content">
-            <div class="breadcrumb">
-                <a href="/">Dashboard</a>
-                <span class="breadcrumb-sep">&#x203a;</span>
-                <span class="breadcrumb-current">Evenements</span>
-            </div>
+{% block content %}
+<div class="breadcrumb">
+    <a href="/">Dashboard</a>
+    <span class="breadcrumb-sep">&#x203a;</span>
+    <span class="breadcrumb-current">Evenements</span>
+</div>
 
-            <div class="page-header">
-                <div>
-                    <h2 class="page-title">Evenements</h2>
-                    <p class="page-subtitle">{{ events|length }} evenement{{ 's' if events|length > 1 }} enregistre{{ 's' if events|length > 1 }}</p>
-                </div>
-                <div class="table-actions">
-                    <input type="text" class="table-filter" placeholder="Filtrer..." id="event-filter">
-                </div>
-            </div>
-
-            {% if events %}
-            <div class="table-container">
-                <table id="events-table">
-                    <thead>
-                        <tr>
-                            <th>Severite</th>
-                            <th>Machine</th>
-                            <th>Message</th>
-                            <th>Type</th>
-                            <th>Horodatage</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for event in events %}
-                        <tr>
-                            <td>
-                                <span class="event-severity {{ event.severity or 'info' }}"></span>
-                            </td>
-                            <td>
-                                {% if event.hostname %}
-                                <a href="/host/{{ event.hostname }}" class="host-link">{{ event.hostname }}</a>
-                                {% else %}
-                                <span class="pid">-</span>
-                                {% endif %}
-                            </td>
-                            <td><span class="event-message-cell">{{ event.message or event.get('description', '-') }}</span></td>
-                            <td><span class="badge-proto">{{ event.type or event.get('event_type', '-') }}</span></td>
-                            <td><span class="event-time">{{ event.get('iso_time', '') }}</span></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <div class="empty-state">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                <h3>Aucun evenement</h3>
-                <p>Les evenements apparaitront ici lorsque les agents detecteront des changements reseau.</p>
-            </div>
-            {% endif %}
-        </main>
+<div class="page-header">
+    <div>
+        <h2 class="page-title">Evenements</h2>
+        <p class="page-subtitle" id="events-subtitle">{{ events|length }} evenement{{ 's' if events|length > 1 }}</p>
     </div>
+    <div class="table-actions">
+        <input type="text" class="table-filter" placeholder="Filtrer..." id="event-filter">
+    </div>
+</div>
 
-    <script>
-        // Clock
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('clock').textContent =
-                now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        }
-        updateClock();
-        setInterval(updateClock, 1000);
+{% if events %}
+<div class="table-container">
+    <table id="events-table">
+        <thead>
+            <tr>
+                <th>Severite</th>
+                <th>Machine</th>
+                <th>Message</th>
+                <th>Type</th>
+                <th>Horodatage</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for event in events %}
+            <tr>
+                <td><span class="event-severity {{ event.severity or 'info' }}"></span></td>
+                <td>
+                    {% if event.hostname %}
+                    <a href="/host/{{ event.hostname }}" class="host-link">{{ event.hostname }}</a>
+                    {% else %}<span class="pid">-</span>{% endif %}
+                </td>
+                <td><span class="event-message-cell">{{ event.message or event.get('description', '-') }}</span></td>
+                <td><span class="badge-proto">{{ event.type or event.get('event_type', '-') }}</span></td>
+                <td><span class="event-time">{{ event.get('iso_time', '') }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    <h3>Aucun evenement</h3>
+    <p>Les evenements apparaitront ici lorsque les agents detecteront des changements reseau.</p>
+</div>
+{% endif %}
+{% endblock %}
 
-        // Filter
-        const filter = document.getElementById('event-filter');
-        if (filter) {
-            filter.addEventListener('input', function() {
-                const q = this.value.toLowerCase();
-                document.querySelectorAll('#events-table tbody tr').forEach(row => {
-                    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
-                });
-            });
-        }
+{% block scripts %}
+<script>
+    function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-        // Auto-refresh (AJAX)
-        async function refreshEvents() {
-            try {
-                const resp = await fetch('/api/events?limit=100');
-                if (!resp.ok) return;
-                const events = await resp.json();
-                const tbody = document.querySelector('#events-table tbody');
-                if (!tbody) return;
-                tbody.innerHTML = events.reverse().map(e => `<tr>
-                    <td><span class="event-severity ${e.severity || 'info'}"></span></td>
-                    <td>${e.hostname ? `<a href="/host/${e.hostname}" class="host-link">${e.hostname}</a>` : '<span class="pid">-</span>'}</td>
-                    <td><span class="event-message-cell">${e.message || e.description || '-'}</span></td>
-                    <td><span class="badge-proto">${e.type || e.event_type || '-'}</span></td>
-                    <td><span class="event-time">${e.iso_time || ''}</span></td>
-                </tr>`).join('');
-            } catch(e) {}
-        }
-        setInterval(refreshEvents, 5000);
-    </script>
-    <script src="/static/actions.js"></script>
-</body>
-</html>
+    let _evFilter = '';
+    document.getElementById('event-filter').addEventListener('input', function() {
+        _evFilter = this.value.toLowerCase();
+        applyEvFilter();
+    });
+    function applyEvFilter() {
+        document.querySelectorAll('#events-table tbody tr').forEach(row => {
+            row.style.display = row.textContent.toLowerCase().includes(_evFilter) ? '' : 'none';
+        });
+    }
+
+    async function refreshEvents() {
+        try {
+            const resp = await fetch('/api/events?limit=100');
+            if (!resp.ok) return;
+            const ct = resp.headers.get('content-type') || '';
+            if (!ct.includes('application/json')) { window.location.href = '/login'; return; }
+            const events = await resp.json();
+            const tbody = document.querySelector('#events-table tbody');
+            if (!tbody) return;
+            document.getElementById('events-subtitle').textContent = events.length + ' evenement' + (events.length > 1 ? 's' : '');
+            const sev = ['critical','warning','info'];
+            tbody.innerHTML = events.reverse().map(e => {
+                const severity = sev.includes(e.severity) ? e.severity : 'info';
+                const hn = esc(e.hostname || '');
+                return `<tr>
+                    <td><span class="event-severity ${severity}"></span></td>
+                    <td>${hn ? `<a href="/host/${hn}" class="host-link">${hn}</a>` : '<span class="pid">-</span>'}</td>
+                    <td><span class="event-message-cell">${esc(e.message || e.description || '-')}</span></td>
+                    <td><span class="badge-proto">${esc(e.type || e.event_type || '-')}</span></td>
+                    <td><span class="event-time">${esc(e.iso_time || '')}</span></td>
+                </tr>`;
+            }).join('');
+            applyEvFilter();
+        } catch(e) {}
+    }
+    setInterval(refreshEvents, 5000);
+</script>
+{% endblock %}

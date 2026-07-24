@@ -12,6 +12,7 @@ from flask import Flask, request, jsonify, render_template, abort, session, redi
 
 from server.auth import (
     require_auth,
+    require_action_auth,
     generate_csrf_token,
     verify_password,
     load_password_hash,
@@ -111,8 +112,27 @@ def get_commands(hostname: str):
     return jsonify(commands)
 
 
+MAX_QUEUE_PER_HOST = 50
+QUEUE_TTL_SECONDS = 3600
+
+VALID_REMOTE_ACTIONS = {"kill", "block-port", "unblock-port", "block-ip", "unblock-ip", "service"}
+
+
+def _purge_stale_queues() -> None:
+    """Supprime les entrées de queue trop anciennes et les queues orphelines vides."""
+    cutoff = time.time() - QUEUE_TTL_SECONDS
+    with _lock:
+        dead = []
+        for h, cmds in _command_queues.items():
+            _command_queues[h] = [c for c in cmds if c.get("_ts", 0) > cutoff]
+            if not _command_queues[h]:
+                dead.append(h)
+        for h in dead:
+            del _command_queues[h]
+
+
 @app.route("/api/commands/<hostname>", methods=["POST"])
-@require_auth
+@require_action_auth
 def push_command(hostname: str):
     """Enqueue une commande pour un agent distant."""
     data = request.get_json(force=True)
@@ -121,11 +141,35 @@ def push_command(hostname: str):
 
     if not action:
         return jsonify({"success": False, "message": "Action requise"}), 400
+    if action not in VALID_REMOTE_ACTIONS:
+        return jsonify({"success": False, "message": f"Action invalide: {action}"}), 400
+
+    # Validation minimale des paramètres selon l'action
+    if action == "kill":
+        pid = params.get("pid")
+        if not isinstance(pid, int) or pid <= 1:
+            return jsonify({"success": False, "message": "PID invalide (doit être > 1)"}), 400
+        sig = params.get("signal", "SIGTERM")
+        if sig not in ("SIGTERM", "SIGKILL", "SIGSTOP", "SIGCONT"):
+            return jsonify({"success": False, "message": f"Signal invalide: {sig}"}), 400
+    elif action in ("block-port", "unblock-port"):
+        if not params.get("spec", "").strip():
+            return jsonify({"success": False, "message": "Spec de port requise"}), 400
+    elif action in ("block-ip", "unblock-ip"):
+        if not params.get("spec", "").strip():
+            return jsonify({"success": False, "message": "Spec IP requise"}), 400
+    elif action == "service":
+        if not params.get("name", "").strip() or not params.get("action", "").strip():
+            return jsonify({"success": False, "message": "Nom et action du service requis"}), 400
+
+    _purge_stale_queues()
 
     with _lock:
         if hostname not in _command_queues:
             _command_queues[hostname] = []
-        _command_queues[hostname].append({"action": action, "params": params})
+        if len(_command_queues[hostname]) >= MAX_QUEUE_PER_HOST:
+            return jsonify({"success": False, "message": f"Queue pleine pour {hostname} ({MAX_QUEUE_PER_HOST} max)"}), 429
+        _command_queues[hostname].append({"action": action, "params": params, "_ts": time.time()})
 
     from server.audit import log_action
     log_action(f"remote:{action}", {"hostname": hostname, **params}, "queued", True,
@@ -147,6 +191,10 @@ def login_page():
 
 @app.route("/login", methods=["POST"])
 def login_submit():
+    from server.ratelimit import action_limiter
+    if not action_limiter.is_allowed(f"login:{request.remote_addr}"):
+        return render_template("login.html", error="Trop de tentatives — réessayez dans une minute.", version=VERSION)
+
     password = request.form.get("password", "")
     stored = PASSWORD_HASH or load_password_hash()
 
@@ -216,6 +264,53 @@ def api_events():
         return jsonify(_events[-limit:])
 
 
+@app.route("/api/hosts/<hostname>/process/<int:pid>")
+@require_auth
+def api_process_detail(hostname: str, pid: int):
+    """Détail d'un processus extrait du dernier snapshot de l'agent distant."""
+    with _lock:
+        snap = _hosts.get(hostname)
+    if not snap:
+        abort(404)
+    # Cherche dans process_summary du snapshot
+    proc = next((p for p in snap.get("process_summary", []) if p.get("pid") == pid), None)
+    if proc is None:
+        # Cherche dans les connexions (contiennent aussi des métriques par PID)
+        conn = next((c for c in snap.get("connections", []) if c.get("pid") == pid), None)
+        if conn is None:
+            abort(404)
+        proc = {k: conn[k] for k in ("pid", "process_name", "cpu_percent", "memory_rss",
+                                      "memory_percent", "io_read_bytes", "io_write_bytes",
+                                      "uptime_seconds") if k in conn}
+        proc["name"] = proc.pop("process_name", "")
+    return jsonify({
+        "pid": proc.get("pid", pid),
+        "name": proc.get("name", ""),
+        "service": proc.get("service", ""),
+        "connections_count": proc.get("connections_count", 0),
+        "cpu_percent": proc.get("cpu_percent", 0),
+        "memory_rss": proc.get("memory_rss", 0),
+        "memory_vms": proc.get("memory_vms", 0),
+        "memory_percent": proc.get("memory_percent", 0),
+        "io_read_bytes": proc.get("io_read_bytes", 0),
+        "io_write_bytes": proc.get("io_write_bytes", 0),
+        "uptime_seconds": proc.get("uptime_seconds", 0),
+        # Les champs détaillés (exe, cwd, env, fichiers) nécessitent un agent local
+        # Ils seront disponibles via une future commande pull
+        "source": "snapshot",
+        "hostname": hostname,
+    })
+
+
+@app.route("/api/stats/<hostname>")
+@require_auth
+def api_host_stats(hostname: str):
+    """Séries temporelles pour les graphiques d'un hôte."""
+    with _lock:
+        hist = _history.get(hostname, [])
+    return jsonify(hist)
+
+
 @app.route("/api/audit")
 @require_auth
 def api_audit():
@@ -227,10 +322,27 @@ def api_audit():
 @app.route("/api/firewall/rules")
 @require_auth
 def api_firewall_rules():
-    """Règles firewall actives."""
+    """Règles firewall du serveur local (dépréciée — préférer /api/hosts/<h>/firewall)."""
     from core.firewall import list_blocked_ports, get_backend
     rules = list_blocked_ports()
     return jsonify({"backend": get_backend(), "rules": rules})
+
+
+@app.route("/api/hosts/<hostname>/firewall")
+@require_auth
+def api_host_firewall(hostname: str):
+    """Règles firewall d'un agent distant, telles que rapportées dans son dernier snapshot."""
+    with _lock:
+        snap = _hosts.get(hostname)
+    if not snap:
+        abort(404)
+    fw = snap.get("firewall", {})
+    return jsonify({
+        "hostname": hostname,
+        "backend": fw.get("backend", ""),
+        "rules": fw.get("rules", []),
+        "error": fw.get("error", ""),
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -257,7 +369,8 @@ def dashboard():
             })
         recent_events = _events[-20:]
 
-    return render_template("dashboard.html", hosts=hosts, events=reversed(recent_events), api_key=API_KEY)
+    return render_template("dashboard.html", hosts=hosts, events=reversed(recent_events),
+                           api_key_set=bool(API_KEY), active_page="dashboard")
 
 
 @app.route("/events")
@@ -273,6 +386,7 @@ def events_page():
         events=all_events,
         hosts_list=hosts_list,
         hosts_count=len(hosts_list),
+        active_page="events",
     )
 
 
@@ -286,14 +400,14 @@ def host_page(hostname: str):
             abort(404)
         hist = _history.get(hostname, [])
 
-    return render_template("host.html", host=snap, history=hist)
+    return render_template("host.html", host=snap, history=hist, active_page="host")
 
 
 @app.route("/firewall")
 @require_auth
 def firewall_page():
     """Page règles firewall."""
-    return render_template("firewall.html")
+    return render_template("firewall.html", active_page="firewall")
 
 
 @app.route("/audit")
@@ -301,7 +415,7 @@ def firewall_page():
 def audit_page():
     """Page journal d'audit."""
     entries = get_recent_audit(100)
-    return render_template("audit.html", entries=entries)
+    return render_template("audit.html", entries=entries, active_page="audit")
 
 
 # ---------------------------------------------------------------------------
@@ -322,6 +436,8 @@ def create_app(api_key: str | None = None, password: str | None = None, secret_k
 
     app.secret_key = secret_key or get_or_create_secret_key()
     app.permanent_session_lifetime = timedelta(hours=8)
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
 
     @app.context_processor
     def inject_globals():

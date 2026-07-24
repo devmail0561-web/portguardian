@@ -12,6 +12,8 @@ class RateLimiter:
         self._requests: dict[str, deque[float]] = {}
         self._lock = threading.Lock()
 
+    _CLEANUP_INTERVAL = 300  # nettoyage toutes les 5 minutes
+
     def is_allowed(self, key: str) -> bool:
         now = time.time()
         cutoff = now - self._window
@@ -28,6 +30,16 @@ class RateLimiter:
                 return False
 
             dq.append(now)
+
+            # Nettoyage périodique des entrées mortes
+            if not hasattr(self, "_last_cleanup"):
+                self._last_cleanup = now
+            if now - self._last_cleanup > self._CLEANUP_INTERVAL:
+                self._last_cleanup = now
+                dead = [k for k, q in self._requests.items() if not q]
+                for k in dead:
+                    del self._requests[k]
+
             return True
 
     def cleanup(self) -> None:

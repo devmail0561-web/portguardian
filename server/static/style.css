@@ -1009,12 +1009,12 @@ tbody tr:last-child td {
     font-family: var(--font-mono);
 }
 
-.badge-success {
+.badge-success, .badge-success-sm {
     background: var(--success-subtle);
     color: var(--success);
 }
 
-.badge-error {
+.badge-error, .badge-error-sm {
     background: var(--danger-subtle);
     color: var(--danger);
 }

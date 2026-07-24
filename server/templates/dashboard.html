@@ -1,303 +1,216 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PortGuardian — Dashboard</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
-    <meta name="csrf-token" content="{{ csrf_token }}">
-</head>
-<body>
-    <div class="app-layout">
-        <!-- Top bar -->
-        <nav class="topbar">
-            <div class="topbar-brand">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-                <h1>PortGuardian<span>v{{ version }}</span></h1>
-            </div>
-            <div class="topbar-right">
-                <div class="refresh-indicator">
-                    <span class="dot"></span>
-                    <span>Live</span>
-                </div>
-                <span class="topbar-time" id="clock"></span>
-                <a href="/firewall" class="nav-link">Firewall</a>
-                <a href="/audit" class="nav-link">Audit</a>
-                <a href="/logout" class="nav-link logout">Logout</a>
-            </div>
-        </nav>
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
 
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Monitoring</div>
-                <ul class="sidebar-nav">
-                    <li>
-                        <a href="/" class="active">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-                            Dashboard
-                        </a>
-                    </li>
-                    <li>
-                        <a href="/events">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                            Evenements
-                            {% if events %}<span class="nav-badge danger">{{ events|list|length }}</span>{% endif %}
-                        </a>
-                    </li>
-                </ul>
-            </div>
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Machines ({{ hosts|length }})</div>
-                <ul class="sidebar-nav">
-                    {% for host in hosts %}
-                    <li>
-                        <a href="/host/{{ host.hostname }}">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                            {{ host.hostname }}
-                            <span class="nav-badge {% if host.status == 'offline' %}danger{% endif %}">{{ host.status }}</span>
-                        </a>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </aside>
+{% block sidebar_extra %}
+<div class="sidebar-section">
+    <div class="sidebar-section-title">Machines ({{ hosts|length }})</div>
+    <ul class="sidebar-nav">
+        {% for host in hosts %}
+        <li>
+            <a href="/host/{{ host.hostname }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                {{ host.hostname }}
+                <span class="nav-badge {% if host.status == 'offline' %}danger{% endif %}">{{ host.status }}</span>
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}
 
-        <!-- Main -->
-        <main class="main-content">
-            <div class="page-header">
-                <div>
-                    <h2 class="page-title">Dashboard</h2>
-                    <p class="page-subtitle">Vue d'ensemble de l'infrastructure surveillee</p>
-                </div>
-            </div>
-
-            <!-- Stats -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-card-header">
-                        <span class="stat-card-label">Machines</span>
-                        <div class="stat-card-icon blue">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                        </div>
-                    </div>
-                    <div class="stat-card-value">{{ hosts|length }}</div>
-                    <div class="stat-card-sub">{{ hosts|selectattr('status', 'equalto', 'online')|list|length }} en ligne</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-header">
-                        <span class="stat-card-label">Connexions totales</span>
-                        <div class="stat-card-icon green">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                        </div>
-                    </div>
-                    <div class="stat-card-value">{{ hosts|sum(attribute='connections') }}</div>
-                    <div class="stat-card-sub">sur {{ hosts|length }} machine{{ 's' if hosts|length > 1 }}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-header">
-                        <span class="stat-card-label">Ports en ecoute</span>
-                        <div class="stat-card-icon yellow">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                        </div>
-                    </div>
-                    <div class="stat-card-value">{{ hosts|sum(attribute='listening') }}</div>
-                    <div class="stat-card-sub">total ports LISTEN</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-header">
-                        <span class="stat-card-label">Evenements</span>
-                        <div class="stat-card-icon red">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                        </div>
-                    </div>
-                    <div class="stat-card-value">{{ events|list|length }}</div>
-                    <div class="stat-card-sub">derniers evenements</div>
-                </div>
-            </div>
-
-            <!-- Hosts table -->
-            <div class="table-container">
-                <div class="table-header">
-                    <div>
-                        <span class="table-title">Machines surveillees</span>
-                        <span class="table-count">{{ hosts|length }} hote{{ 's' if hosts|length > 1 }}</span>
-                    </div>
-                    <div class="table-actions">
-                        <input type="text" class="table-filter" placeholder="Filtrer..." id="host-filter">
-                    </div>
-                </div>
-                {% if hosts %}
-                <table id="hosts-table">
-                    <thead>
-                        <tr>
-                            <th>Statut</th>
-                            <th>Hostname</th>
-                            <th class="sortable">Connexions</th>
-                            <th class="sortable">Ports en ecoute</th>
-                            <th>Evenements</th>
-                            <th>Derniere activite</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for host in hosts %}
-                        <tr>
-                            <td>
-                                <span class="badge badge-{{ host.status }}">
-                                    <span class="badge-dot"></span>
-                                    {{ host.status }}
-                                </span>
-                            </td>
-                            <td><a href="/host/{{ host.hostname }}" class="host-link">{{ host.hostname }}</a></td>
-                            <td><span class="port-num">{{ host.connections }}</span></td>
-                            <td><span class="port-num">{{ host.listening }}</span></td>
-                            <td>
-                                {% if host.events > 0 %}
-                                <span class="badge badge-stale">{{ host.events }}</span>
-                                {% else %}
-                                <span class="pid">0</span>
-                                {% endif %}
-                            </td>
-                            <td><span class="event-time">{{ host.last_seen }}</span></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <div class="empty-state">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                    <h3>Aucun agent connecte</h3>
-                    <p>Deployez l'agent PortGuardian sur vos machines pour commencer la surveillance.</p>
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- Deploy section -->
-            <div class="table-container">
-                <div class="table-header">
-                    <div>
-                        <span class="table-title">Deployer un agent</span>
-                        <span class="table-count">Instructions pour ajouter une machine</span>
-                    </div>
-                </div>
-                <div class="deploy-section">
-                    <div class="deploy-step">
-                        <span class="deploy-step-num">1</span>
-                        <div class="deploy-step-content">
-                            <div class="deploy-step-title">Cloner et installer sur la machine cible</div>
-                            <div class="deploy-code-block">
-                                <code id="deploy-cmd-1">git clone &lt;url-du-depot&gt; &amp;&amp; cd port_listen_script &amp;&amp; python3 -m venv venv &amp;&amp; venv/bin/pip install -r portguardian/requirements.txt</code>
-                                <button class="deploy-copy-btn" onclick="copyCmd('deploy-cmd-1')">Copier</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="deploy-step">
-                        <span class="deploy-step-num">2</span>
-                        <div class="deploy-step-content">
-                            <div class="deploy-step-title">Lancer l'agent avec connexion a ce serveur</div>
-                            <div class="deploy-code-block">
-                                <code id="deploy-cmd-2">./portguardian agent run --server http://{{ request.host }}{% if api_key %} --api-key {{ api_key }}{% endif %}</code>
-                                <button class="deploy-copy-btn" onclick="copyCmd('deploy-cmd-2')">Copier</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="deploy-step">
-                        <span class="deploy-step-num">3</span>
-                        <div class="deploy-step-content">
-                            <div class="deploy-step-title">(Optionnel) Installer en service systemd pour demarrage automatique</div>
-                            <div class="deploy-code-block">
-                                <code id="deploy-cmd-3">sudo cp daemon/portguardian-agent.service /etc/systemd/system/ &amp;&amp; sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable --now portguardian-agent</code>
-                                <button class="deploy-copy-btn" onclick="copyCmd('deploy-cmd-3')">Copier</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Events -->
-            {% if events %}
-            <div class="events-panel">
-                <div class="events-header">
-                    <span class="events-title">Evenements recents</span>
-                </div>
-                <ul class="events-list">
-                    {% for event in events %}
-                    <li class="event-item">
-                        <span class="event-severity {{ event.severity }}"></span>
-                        <div class="event-content">
-                            <div class="event-message">{{ event.message }}</div>
-                            <div class="event-meta">{{ event.hostname }}</div>
-                        </div>
-                        <span class="event-time">{{ event.get('iso_time', '') }}</span>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
-            {% endif %}
-        </main>
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2 class="page-title">Dashboard</h2>
+        <p class="page-subtitle">Vue d'ensemble de l'infrastructure surveillee</p>
     </div>
+</div>
 
-    <script>
-        // Clock
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('clock').textContent =
-                now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        }
-        updateClock();
-        setInterval(updateClock, 1000);
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-card-header">
+            <span class="stat-card-label">Machines</span>
+            <div class="stat-card-icon blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </div>
+        </div>
+        <div class="stat-card-value">{{ hosts|length }}</div>
+        <div class="stat-card-sub">{{ hosts|selectattr('status', 'equalto', 'online')|list|length }} en ligne</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-header">
+            <span class="stat-card-label">Connexions</span>
+            <div class="stat-card-icon green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </div>
+        </div>
+        <div class="stat-card-value">{{ hosts|sum(attribute='connections') }}</div>
+        <div class="stat-card-sub">actives</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-header">
+            <span class="stat-card-label">Ports LISTEN</span>
+            <div class="stat-card-icon yellow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+        </div>
+        <div class="stat-card-value">{{ hosts|sum(attribute='listening') }}</div>
+        <div class="stat-card-sub">total</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-header">
+            <span class="stat-card-label">Evenements</span>
+            <div class="stat-card-icon red">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+        </div>
+        <div class="stat-card-value">{{ events|list|length }}</div>
+        <div class="stat-card-sub">recents</div>
+    </div>
+</div>
 
-        // Filter
-        const filter = document.getElementById('host-filter');
-        if (filter) {
-            filter.addEventListener('input', function() {
-                const q = this.value.toLowerCase();
-                document.querySelectorAll('#hosts-table tbody tr').forEach(row => {
-                    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
-                });
-            });
-        }
+<div class="table-container">
+    <div class="table-header">
+        <div>
+            <span class="table-title">Machines surveillees</span>
+            <span class="table-count">{{ hosts|length }} hote{{ 's' if hosts|length > 1 }}</span>
+        </div>
+        <div class="table-actions">
+            <input type="text" class="table-filter" placeholder="Filtrer..." id="host-filter">
+        </div>
+    </div>
+    {% if hosts %}
+    <table id="hosts-table">
+        <thead>
+            <tr>
+                <th>Statut</th>
+                <th>Hostname</th>
+                <th>Connexions</th>
+                <th>Ports</th>
+                <th>Evenements</th>
+                <th>Derniere activite</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for host in hosts %}
+            <tr>
+                <td><span class="badge badge-{{ host.status }}"><span class="badge-dot"></span>{{ host.status }}</span></td>
+                <td><a href="/host/{{ host.hostname }}" class="host-link">{{ host.hostname }}</a></td>
+                <td><span class="port-num">{{ host.connections }}</span></td>
+                <td><span class="port-num">{{ host.listening }}</span></td>
+                <td>
+                    {% if host.events > 0 %}<span class="badge badge-stale">{{ host.events }}</span>
+                    {% else %}<span class="pid">0</span>{% endif %}
+                </td>
+                <td><span class="event-time">{{ host.last_seen }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <h3>Aucun agent connecte</h3>
+        <p>Deployez l'agent PortGuardian sur vos machines pour commencer la surveillance.</p>
+    </div>
+    {% endif %}
+</div>
 
-        // Copy deploy commands
-        function copyCmd(id) {
-            const el = document.getElementById(id);
-            const text = el.textContent;
-            navigator.clipboard.writeText(text).then(() => {
-                const btn = el.parentElement.querySelector('.deploy-copy-btn');
-                btn.textContent = 'Copie !';
-                setTimeout(() => { btn.textContent = 'Copier'; }, 2000);
-            });
-        }
+<div class="table-container">
+    <div class="table-header">
+        <div>
+            <span class="table-title">Deployer un agent</span>
+            <span class="table-count">Instructions</span>
+        </div>
+    </div>
+    <div class="deploy-section">
+        <div class="deploy-step">
+            <span class="deploy-step-num">1</span>
+            <div class="deploy-step-content">
+                <div class="deploy-step-title">Cloner et installer sur la machine cible</div>
+                <div class="deploy-code-block">
+                    <code id="deploy-cmd-1">git clone &lt;url-du-depot&gt; &amp;&amp; cd port_listen_script &amp;&amp; python3 -m venv venv &amp;&amp; venv/bin/pip install -r portguardian/requirements.txt</code>
+                    <button class="deploy-copy-btn" onclick="copyCmd('deploy-cmd-1')">Copier</button>
+                </div>
+            </div>
+        </div>
+        <div class="deploy-step">
+            <span class="deploy-step-num">2</span>
+            <div class="deploy-step-content">
+                <div class="deploy-step-title">Lancer l'agent</div>
+                <div class="deploy-code-block">
+                    <code id="deploy-cmd-2">./portguardian agent run --server http://{{ request.host }}{% if api_key_set %} --api-key &lt;VOTRE_API_KEY&gt;{% endif %}</code>
+                    <button class="deploy-copy-btn" onclick="copyCmd('deploy-cmd-2')">Copier</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
-        // Auto-refresh (AJAX)
-        async function refreshDashboard() {
-            try {
-                const resp = await fetch('/api/hosts');
-                if (!resp.ok) return;
-                const hosts = await resp.json();
-                const tbody = document.querySelector('#hosts-table tbody');
-                if (!tbody) return;
-                tbody.innerHTML = hosts.map(h => {
-                    const age = (Date.now() / 1000) - (h.timestamp || 0);
-                    const status = age < 120 ? 'online' : age < 600 ? 'stale' : 'offline';
-                    return `<tr>
-                        <td><span class="badge badge-${status}"><span class="badge-dot"></span>${status}</span></td>
-                        <td><a href="/host/${h.hostname}" class="host-link">${h.hostname}</a></td>
-                        <td><span class="port-num">${h.connections_total}</span></td>
-                        <td><span class="port-num">${h.listening_total}</span></td>
-                        <td>${h.events_count > 0 ? `<span class="badge badge-stale">${h.events_count}</span>` : '<span class="pid">0</span>'}</td>
-                        <td><span class="event-time">${h.last_seen}</span></td>
-                    </tr>`;
-                }).join('');
-            } catch(e) {}
-        }
-        setInterval(refreshDashboard, 5000);
-    </script>
-    <script src="/static/actions.js"></script>
-</body>
-</html>
+{% if events %}
+<div class="events-panel">
+    <div class="events-header">
+        <span class="events-title">Evenements recents</span>
+    </div>
+    <ul class="events-list">
+        {% for event in events %}
+        <li class="event-item">
+            <span class="event-severity {{ event.severity }}"></span>
+            <div class="event-content">
+                <div class="event-message">{{ event.message }}</div>
+                <div class="event-meta">{{ event.hostname }}</div>
+            </div>
+            <span class="event-time">{{ event.get('iso_time', '') }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('host-filter').addEventListener('input', function() {
+        const q = this.value.toLowerCase();
+        document.querySelectorAll('#hosts-table tbody tr').forEach(row => {
+            row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+
+    function copyCmd(id) {
+        navigator.clipboard.writeText(document.getElementById(id).textContent).then(() => {
+            const btn = document.getElementById(id).parentElement.querySelector('.deploy-copy-btn');
+            btn.textContent = 'Copie !';
+            setTimeout(() => { btn.textContent = 'Copier'; }, 2000);
+        });
+    }
+
+    function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    async function refreshDashboard() {
+        try {
+            const resp = await fetch('/api/hosts');
+            if (!resp.ok) return;
+            const ct = resp.headers.get('content-type') || '';
+            if (!ct.includes('application/json')) { window.location.href = '/login'; return; }
+            const hosts = await resp.json();
+            const tbody = document.querySelector('#hosts-table tbody');
+            if (!tbody) return;
+            tbody.innerHTML = hosts.map(h => {
+                const age = (Date.now() / 1000) - (h.timestamp || 0);
+                const status = age < 120 ? 'online' : age < 600 ? 'stale' : 'offline';
+                const hn = esc(h.hostname);
+                return `<tr>
+                    <td><span class="badge badge-${status}"><span class="badge-dot"></span>${status}</span></td>
+                    <td><a href="/host/${hn}" class="host-link">${hn}</a></td>
+                    <td><span class="port-num">${h.connections_total|0}</span></td>
+                    <td><span class="port-num">${h.listening_total|0}</span></td>
+                    <td>${(h.events_count|0) > 0 ? `<span class="badge badge-stale">${h.events_count|0}</span>` : '<span class="pid">0</span>'}</td>
+                    <td><span class="event-time">${esc(h.last_seen)}</span></td>
+                </tr>`;
+            }).join('');
+        } catch(e) {}
+    }
+    setInterval(refreshDashboard, 5000);
+</script>
+{% endblock %}

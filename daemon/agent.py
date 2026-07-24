@@ -201,7 +201,18 @@ class Agent:
                 "memory_percent": psutil.virtual_memory().percent,
                 "boot_time": psutil.boot_time(),
             },
+            **self._collect_firewall(),
         }
+
+    def _collect_firewall(self) -> dict:
+        """Collecte les règles firewall locales de la machine."""
+        try:
+            from core.firewall import list_blocked_ports, get_backend
+            rules = list_blocked_ports()
+            backend = get_backend()
+            return {"firewall": {"backend": backend, "rules": rules}}
+        except Exception:
+            return {"firewall": {"backend": "", "rules": [], "error": "acces refuse (sudo requis?)"}}
 
     def _detect_changes(self, snapshot: dict) -> list[dict]:
         """Détecte les ports ouverts/fermés depuis le dernier scan."""

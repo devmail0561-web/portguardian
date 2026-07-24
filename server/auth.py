@@ -72,13 +72,20 @@ def validate_csrf_token(token: str) -> bool:
     return hmac.compare_digest(expected, token)
 
 
+_LOCALHOST = {"127.0.0.1", "::1", "localhost"}
+
+
 def require_auth(f):
-    """Require either a valid session or a valid API key. Bypassed if NO_AUTH."""
+    """Require either a valid session or a valid API key. Bypassed if NO_AUTH (localhost only)."""
     @wraps(f)
     def decorated(*args, **kwargs):
         from server.app import API_KEY, NO_AUTH
 
         if NO_AUTH:
+            # Vérification IP côté serveur — défense en profondeur contre les reverse proxies
+            remote = request.remote_addr or ""
+            if remote not in _LOCALHOST:
+                abort(403)
             return f(*args, **kwargs)
 
         auth_header = request.headers.get("Authorization", "")
@@ -104,6 +111,9 @@ def require_action_auth(f):
         from server.app import API_KEY, NO_AUTH
 
         if NO_AUTH:
+            remote = request.remote_addr or ""
+            if remote not in _LOCALHOST:
+                abort(403)
             return f(*args, **kwargs)
 
         auth_header = request.headers.get("Authorization", "")

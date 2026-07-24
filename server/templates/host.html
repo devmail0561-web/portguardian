@@ -1,410 +1,604 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PortGuardian — {{ host.hostname }}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
-    <meta name="csrf-token" content="{{ csrf_token }}">
-</head>
-<body>
-    <div class="app-layout">
-        <nav class="topbar">
-            <div class="topbar-brand">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-                <h1>PortGuardian<span>v{{ version }}</span></h1>
-            </div>
-            <div class="topbar-right">
-                <div class="refresh-indicator">
-                    <span class="dot" id="live-dot"></span>
-                    <span id="live-label">Live</span>
-                </div>
-                <span class="topbar-time" id="clock"></span>
-                <a href="/firewall" class="nav-link">Firewall</a>
-                <a href="/audit" class="nav-link">Audit</a>
-                <a href="/logout" class="nav-link logout">Logout</a>
-            </div>
-        </nav>
+{% extends "base.html" %}
+{% block title %}{{ host.hostname }}{% endblock %}
 
-        <aside class="sidebar">
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Navigation</div>
-                <ul class="sidebar-nav">
-                    <li><a href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard</a></li>
-                    <li><a href="/events"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Evenements</a></li>
-                    <li><a href="/firewall"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Firewall</a></li>
-                </ul>
-            </div>
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Machine</div>
-                <ul class="sidebar-nav">
-                    <li><a href="/host/{{ host.hostname }}" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>{{ host.hostname }}</a></li>
-                </ul>
-            </div>
-        </aside>
+{% block head %}
+<style>
+.host-layout {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 60px);
+    overflow: hidden;
+    padding: 14px 20px 0;
+    gap: 10px;
+}
+.host-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+}
+.host-stats {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    flex-shrink: 0;
+}
+.host-stats .stat-card { padding: 10px 14px; }
+.host-stats .stat-card-value { font-size: 20px; }
+/* sparkline in stat card */
+.sparkline { display: block; width: 100%; height: 28px; margin-top: 4px; }
 
-        <main class="main-content">
-            <div class="breadcrumb">
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; }
+.tab-btn {
+    padding: 6px 14px; font-size: 12px; font-weight: 600; font-family: var(--font-sans);
+    color: var(--text-muted); background: none; border: none;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    cursor: pointer; transition: all var(--transition); white-space: nowrap;
+}
+.tab-btn:hover { color: var(--text-primary); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-count {
+    display: inline-block; margin-left: 5px; background: var(--bg-tertiary);
+    color: var(--text-muted); font-size: 10px; padding: 1px 6px; border-radius: 10px;
+}
+.tab-btn.active .tab-count { background: var(--accent-subtle); color: var(--accent); }
+.tab-count-warn { background: var(--warning-subtle) !important; color: var(--warning) !important; }
+
+.tab-panels { flex: 1; min-height: 0; }
+.tab-panel { display: none; height: 100%; overflow-y: auto; padding-bottom: 16px; }
+.tab-panel.active { display: block; }
+.tab-panel .table-container {
+    margin-bottom: 0; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle);
+}
+
+/* Process detail modal */
+.modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 10000; opacity: 0; transition: opacity 200ms ease; pointer-events: none;
+}
+.modal-overlay.open { opacity: 1; pointer-events: auto; }
+.proc-modal {
+    background: var(--bg-card); border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg); width: min(820px, 95vw); max-height: 85vh;
+    display: flex; flex-direction: column; box-shadow: var(--shadow-lg);
+}
+.proc-modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0;
+}
+.proc-modal-title { font-size: 15px; font-weight: 600; }
+.proc-modal-close {
+    background: none; border: none; color: var(--text-muted);
+    font-size: 18px; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+}
+.proc-modal-close:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+.proc-modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; margin-bottom: 16px; }
+.detail-row { display: flex; gap: 6px; align-items: baseline; font-size: 13px; }
+.detail-label { color: var(--text-muted); font-size: 11px; min-width: 80px; }
+.detail-value { color: var(--text-primary); font-family: var(--font-mono); font-size: 12px; word-break: break-all; }
+.detail-section {
+    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-subtle);
+}
+.detail-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--text-muted); margin-bottom: 8px; }
+.detail-list { font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary);
+    max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.detail-list span { padding: 2px 4px; border-radius: 3px; }
+.detail-list span:hover { background: var(--bg-tertiary); }
+
+/* bar inline */
+.bar-wrap { display: inline-flex; align-items: center; gap: 6px; }
+.bar-bg { width: 60px; height: 6px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+.bar-ok { background: var(--success); }
+.bar-warn { background: var(--warning); }
+.bar-crit { background: var(--danger); }
+
+/* event row clickable */
+.event-row { cursor: pointer; }
+.event-row:hover td { background: rgba(59,130,246,.06); }
+.event-detail-cell { display: none; background: var(--bg-tertiary); }
+.event-detail-cell.open { display: table-row; }
+.event-detail-box { padding: 12px 16px; font-size: 12px; font-family: var(--font-mono);
+    color: var(--text-secondary); white-space: pre-wrap; word-break: break-all; }
+</style>
+{% endblock %}
+
+{% block sidebar_extra %}
+<div class="sidebar-section">
+    <div class="sidebar-section-title">Machine</div>
+    <ul class="sidebar-nav">
+        <li>
+            <a href="/host/{{ host.hostname }}" class="active">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                {{ host.hostname }}
+            </a>
+        </li>
+    </ul>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="host-layout">
+
+    <!-- Header -->
+    <div class="host-header">
+        <div>
+            <div class="breadcrumb" style="margin-bottom:2px">
                 <a href="/">Dashboard</a>
-                <span class="breadcrumb-sep">&#x203a;</span>
+                <span class="breadcrumb-sep">›</span>
                 <span class="breadcrumb-current">{{ host.hostname }}</span>
             </div>
+            <h2 class="page-title" style="line-height:1.1">{{ host.hostname }}</h2>
+        </div>
+        <p class="page-subtitle" id="last-seen">{{ host.iso_time }}</p>
+    </div>
 
-            <div class="page-header">
-                <div>
-                    <h2 class="page-title">{{ host.hostname }}</h2>
-                    <p class="page-subtitle" id="last-seen">Dernier rapport : {{ host.iso_time }}</p>
-                </div>
+    <!-- Stats + sparklines -->
+    <div class="host-stats">
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <span class="stat-card-label">Connexions</span>
+                <div class="stat-card-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
             </div>
-
-            <!-- Stats -->
-            <div class="stats-grid" id="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-card-header">
-                        <span class="stat-card-label">Connexions</span>
-                        <div class="stat-card-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
-                    </div>
-                    <div class="stat-card-value" id="stat-conns">{{ host.connections_total }}</div>
-                    <div class="stat-card-sub">actives</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-header">
-                        <span class="stat-card-label">Ports LISTEN</span>
-                        <div class="stat-card-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
-                    </div>
-                    <div class="stat-card-value" id="stat-listen">{{ host.listening_total }}</div>
-                    <div class="stat-card-sub">en ecoute</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-header">
-                        <span class="stat-card-label">Evenements</span>
-                        <div class="stat-card-icon yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
-                    </div>
-                    <div class="stat-card-value" id="stat-events">{{ host.events|length if host.events else 0 }}</div>
-                    <div class="stat-card-sub">depuis dernier scan</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-header">
-                        <span class="stat-card-label">Bande passante</span>
-                        <div class="stat-card-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="4"/><polyline points="6 10 12 4 18 10"/></svg></div>
-                    </div>
-                    <div class="stat-card-value" id="stat-bw">—</div>
-                    <div class="stat-card-sub" id="stat-bw-sub">total interfaces</div>
-                </div>
+            <div class="stat-card-value" id="stat-conns">{{ host.connections_total }}</div>
+            <svg class="sparkline" id="spark-conns" viewBox="0 0 120 28" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <span class="stat-card-label">Ports LISTEN</span>
+                <div class="stat-card-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
             </div>
-
-            <!-- Bandwidth -->
-            <div class="table-container" id="bw-section">
-                <div class="table-header">
-                    <div>
-                        <span class="table-title">Bande passante par interface</span>
-                        <span class="table-count" id="bw-count"></span>
-                    </div>
-                </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Interface</th>
-                            <th>Download</th>
-                            <th>Upload</th>
-                            <th>Total recu</th>
-                            <th>Total envoye</th>
-                        </tr>
-                    </thead>
-                    <tbody id="bw-body">
-                        <tr><td colspan="5" class="empty-cell">—</td></tr>
-                    </tbody>
-                </table>
+            <div class="stat-card-value" id="stat-listen">{{ host.listening_total }}</div>
+            <svg class="sparkline" id="spark-listen" viewBox="0 0 120 28" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <span class="stat-card-label">Bande passante</span>
+                <div class="stat-card-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="4"/><polyline points="6 10 12 4 18 10"/></svg></div>
             </div>
+            <div class="stat-card-value" id="stat-bw">--</div>
+            <div class="stat-card-sub" id="stat-bw-sub" style="font-size:10px">--</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <span class="stat-card-label">Processus</span>
+                <div class="stat-card-icon yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/></svg></div>
+            </div>
+            <div class="stat-card-value" id="stat-procs">0</div>
+            <div class="stat-card-sub">reseau actifs</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <span class="stat-card-label">Evenements</span>
+                <div class="stat-card-icon yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg></div>
+            </div>
+            <div class="stat-card-value" id="stat-events">{{ host.events|length if host.events else 0 }}</div>
+            <div class="stat-card-sub">detectes</div>
+        </div>
+    </div>
 
-            <!-- Listening ports -->
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab-btn active" onclick="showTab('ports')">
+            Ports <span class="tab-count" id="tc-ports">{{ host.listening_total }}</span>
+        </button>
+        <button class="tab-btn" onclick="showTab('conns')">
+            Connexions <span class="tab-count" id="tc-conns">{{ host.connections_total }}</span>
+        </button>
+        <button class="tab-btn" onclick="showTab('procs')">
+            Processus <span class="tab-count" id="tc-procs">0</span>
+        </button>
+        <button class="tab-btn" onclick="showTab('bw')">
+            Bande passante
+        </button>
+        <button class="tab-btn" onclick="showTab('events')">
+            Evenements <span class="tab-count" id="tc-events">{{ host.events|length if host.events else 0 }}</span>
+        </button>
+    </div>
+
+    <!-- Tab panels -->
+    <div class="tab-panels">
+
+        <!-- Ports -->
+        <div class="tab-panel active" id="tab-ports">
             <div class="table-container">
                 <div class="table-header">
-                    <div>
-                        <span class="table-title">Ports en ecoute</span>
-                        <span class="table-count" id="listen-count"></span>
-                    </div>
-                    <div class="table-actions">
-                        <input type="text" class="table-filter" placeholder="Filtrer..." id="listen-filter">
-                    </div>
+                    <div><span class="table-title">Ports en ecoute</span><span class="table-count" id="listen-count"></span></div>
+                    <input type="text" class="table-filter" placeholder="Filtrer..." id="listen-filter">
                 </div>
                 <table id="listen-table">
-                    <thead>
-                        <tr>
-                            <th>Proto</th>
-                            <th>Adresse</th>
-                            <th>Port</th>
-                            <th>Processus</th>
-                            <th>PID</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
+                    <thead><tr>
+                        <th>Proto</th><th>Adresse</th><th>Port</th>
+                        <th>Processus</th><th>PID</th><th>CPU</th><th>Mem</th><th>Actions</th>
+                    </tr></thead>
                     <tbody id="listen-body"></tbody>
                 </table>
             </div>
+        </div>
 
-            <!-- Process summary -->
+        <!-- Connexions -->
+        <div class="tab-panel" id="tab-conns">
             <div class="table-container">
                 <div class="table-header">
-                    <div>
-                        <span class="table-title">Processus reseau</span>
-                        <span class="table-count" id="proc-count"></span>
-                    </div>
-                </div>
-                <table id="proc-table">
-                    <thead>
-                        <tr>
-                            <th>PID</th>
-                            <th>Processus</th>
-                            <th>Service</th>
-                            <th>Connexions</th>
-                            <th>CPU</th>
-                            <th>Memoire</th>
-                            <th>I/O (R/W)</th>
-                            <th>Uptime</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="proc-body"></tbody>
-                </table>
-            </div>
-
-            <!-- All connections -->
-            <div class="table-container">
-                <div class="table-header">
-                    <div>
-                        <span class="table-title">Connexions actives</span>
-                        <span class="table-count" id="conn-count"></span>
-                    </div>
-                    <div class="table-actions">
-                        <input type="text" class="table-filter" placeholder="Filtrer..." id="conn-filter">
-                    </div>
+                    <div><span class="table-title">Connexions actives</span><span class="table-count" id="conn-count"></span></div>
+                    <input type="text" class="table-filter" placeholder="Filtrer..." id="conn-filter">
                 </div>
                 <table id="conn-table">
-                    <thead>
-                        <tr>
-                            <th>Proto</th>
-                            <th>Local</th>
-                            <th>Port</th>
-                            <th>Distant</th>
-                            <th>Etat</th>
-                            <th>Processus</th>
-                            <th>PID</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
+                    <thead><tr>
+                        <th>Proto</th><th>Local</th><th>Port</th><th>Distant</th>
+                        <th>Etat</th><th>Processus</th><th>PID</th><th>Actions</th>
+                    </tr></thead>
                     <tbody id="conn-body"></tbody>
                 </table>
             </div>
+        </div>
 
-            <!-- Events -->
-            <div class="events-panel" id="events-section" style="display:none">
-                <div class="events-header">
-                    <span class="events-title">Evenements detectes</span>
+        <!-- Processus -->
+        <div class="tab-panel" id="tab-procs">
+            <div class="table-container">
+                <div class="table-header">
+                    <div><span class="table-title">Processus reseau</span><span class="table-count" id="proc-count"></span></div>
                 </div>
-                <ul class="events-list" id="events-list"></ul>
+                <table id="proc-table">
+                    <thead><tr>
+                        <th>PID</th><th>Processus</th><th>Service</th><th>Conn.</th>
+                        <th>CPU</th><th>Memoire</th><th>I/O</th><th>Uptime</th><th>Actions</th>
+                    </tr></thead>
+                    <tbody id="proc-body"></tbody>
+                </table>
             </div>
-        </main>
-    </div>
+        </div>
 
-    <script src="/static/actions.js"></script>
-    <script>
-        const HOSTNAME = "{{ host.hostname }}";
-        let lastData = null;
-
-        function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
-
-        function fmtRate(bytesPerSec) {
-            if (bytesPerSec > 1048576) return (bytesPerSec / 1048576).toFixed(1) + " MB/s";
-            if (bytesPerSec > 1024) return (bytesPerSec / 1024).toFixed(1) + " KB/s";
-            return Math.round(bytesPerSec) + " B/s";
-        }
-
-        function fmtBytes(b) {
-            if (b > 1073741824) return (b / 1073741824).toFixed(1) + " GB";
-            if (b > 1048576) return (b / 1048576).toFixed(1) + " MB";
-            if (b > 1024) return (b / 1024).toFixed(0) + " KB";
-            return b + " B";
-        }
-
-        function stateClass(status) {
-            if (status === "LISTEN") return "state-listen";
-            if (status === "ESTABLISHED") return "state-established";
-            if (status === "TIME_WAIT" || status === "CLOSE_WAIT") return "state-time-wait";
-            return "state-other";
-        }
-
-        function fmtUptime(sec) {
-            if (!sec || sec <= 0) return "-";
-            if (sec > 86400) return Math.floor(sec / 86400) + "j";
-            if (sec > 3600) return Math.floor(sec / 3600) + "h";
-            return Math.floor(sec / 60) + "m";
-        }
-
-        function renderListening(data) {
-            const list = data.listening || [];
-            document.getElementById("listen-count").textContent = list.length + " port(s)";
-            const tbody = document.getElementById("listen-body");
-            tbody.innerHTML = list.map(c => `<tr>
-                <td><span class="badge-proto">${esc(c.protocol)}</span></td>
-                <td><span class="proc-name">${esc(c.local_addr)}</span></td>
-                <td><span class="port-num">${c.local_port}</span></td>
-                <td><span class="proc-name">${esc(c.process_name || "-")}${c.service ? ` <span class="badge-proto">${esc(c.service)}</span>` : ""}</span></td>
-                <td><span class="pid">${c.pid || "-"}</span></td>
-                <td class="actions-cell">
-                    <button class="btn-action btn-block" onclick="Actions.blockPort('${c.local_port}','${c.protocol}')" title="Bloquer">Block</button>
-                    ${c.pid ? `<button class="btn-action btn-kill" onclick="Actions.killProcess(${c.pid},'${esc(c.process_name||"")}')" title="SIGTERM">Kill</button>` : ""}
-                    ${c.service ? `<button class="btn-action" onclick="Actions.serviceAction('${esc(c.service)}','restart')" title="Restart service">Restart</button>` : ""}
-                </td>
-            </tr>`).join("");
-        }
-
-        function renderProcessSummary(data) {
-            const list = data.process_summary || [];
-            document.getElementById("proc-count").textContent = list.length + " processus";
-            const tbody = document.getElementById("proc-body");
-            const sorted = list.sort((a, b) => (b.cpu_percent || 0) - (a.cpu_percent || 0));
-            tbody.innerHTML = sorted.map(p => `<tr>
-                <td><span class="pid">${p.pid}</span></td>
-                <td><span class="proc-name">${esc(p.name || "-")}</span></td>
-                <td>${p.service ? `<span class="badge-proto">${esc(p.service)}</span>` : '<span class="pid">-</span>'}</td>
-                <td><span class="port-num">${p.connections_count || 0}</span></td>
-                <td><span class="${(p.cpu_percent||0) > 50 ? 'state-listen' : 'pid'}">${p.cpu_percent !== undefined ? p.cpu_percent + "%" : "-"}</span></td>
-                <td><span class="pid">${p.memory_rss ? fmtBytes(p.memory_rss) : "-"} (${p.memory_percent || 0}%)</span></td>
-                <td><span class="pid">R:${fmtBytes(p.io_read_bytes||0)} W:${fmtBytes(p.io_write_bytes||0)}</span></td>
-                <td><span class="pid">${fmtUptime(p.uptime_seconds)}</span></td>
-                <td class="actions-cell">
-                    <button class="btn-action btn-kill" onclick="Actions.killProcess(${p.pid},'${esc(p.name||"")}')" title="SIGTERM">Kill</button>
-                    ${p.service ? `<button class="btn-action" onclick="Actions.serviceAction('${esc(p.service)}','restart')" title="Restart">Restart</button>` : ""}
-                </td>
-            </tr>`).join("");
-        }
-
-        function renderConnections(data) {
-            const list = data.connections || [];
-            document.getElementById("conn-count").textContent = list.length + " connexion(s)";
-            const tbody = document.getElementById("conn-body");
-            tbody.innerHTML = list.map(c => {
-                const remoteHost = c.dns_hostname || "";
-                const remoteLabel = c.remote_addr ? (c.remote_addr + (c.remote_port ? ":" + c.remote_port : "")) : "*";
-                const remoteFull = remoteHost ? `${remoteLabel} <span class="pid">(${esc(remoteHost)})</span>` : remoteLabel;
-                const canBlockIp = c.remote_addr && c.remote_addr !== "127.0.0.1" && c.remote_addr !== "::1" && c.remote_addr !== "";
-                const cpuLabel = c.cpu_percent !== undefined ? `${c.cpu_percent}%` : "";
-                const memLabel = c.memory_rss ? fmtBytes(c.memory_rss) : "";
-                const ioLabel = c.io_read_bytes || c.io_write_bytes ? `R:${fmtBytes(c.io_read_bytes||0)} W:${fmtBytes(c.io_write_bytes||0)}` : "";
-                return `<tr>
-                    <td><span class="badge-proto">${esc(c.protocol)}</span></td>
-                    <td><span class="proc-name">${esc(c.local_addr)}</span></td>
-                    <td><span class="port-num">${c.local_port}</span></td>
-                    <td><span class="proc-name">${remoteFull}</span></td>
-                    <td><span class="${stateClass(c.status)}">${esc(c.status)}</span></td>
-                    <td><span class="proc-name">${esc(c.process_name || "-")}${c.service ? ` <span class="badge-proto">${esc(c.service)}</span>` : ""}</span>
-                        ${cpuLabel || memLabel ? `<br><span class="pid">${cpuLabel} ${memLabel} ${ioLabel}</span>` : ""}
-                    </td>
-                    <td><span class="pid">${c.pid || "-"}</span></td>
-                    <td class="actions-cell">
-                        ${c.pid ? `<button class="btn-action btn-kill" onclick="Actions.killProcess(${c.pid},'${esc(c.process_name||"")}')" title="SIGTERM">Kill</button>` : ""}
-                        ${canBlockIp ? `<button class="btn-action btn-block" onclick="Actions.blockIp('${esc(c.remote_addr)}')" title="Bloquer IP">Block IP</button>` : ""}
-                    </td>
-                </tr>`;
-            }).join("");
-        }
-
-        function renderBandwidth(data) {
-            const bw = data.bandwidth || [];
-            document.getElementById("bw-count").textContent = bw.length + " interface(s)";
-            if (bw.length === 0) {
-                document.getElementById("bw-body").innerHTML = '<tr><td colspan="5" class="empty-cell">Aucune donnee</td></tr>';
-                document.getElementById("stat-bw").textContent = "—";
-                return;
-            }
-            const totalRecv = bw.reduce((s, i) => s + (i.recv_rate || 0), 0);
-            const totalSent = bw.reduce((s, i) => s + (i.sent_rate || 0), 0);
-            document.getElementById("stat-bw").textContent = fmtRate(totalRecv + totalSent);
-            document.getElementById("stat-bw-sub").textContent = "↓" + fmtRate(totalRecv) + " ↑" + fmtRate(totalSent);
-
-            const tbody = document.getElementById("bw-body");
-            tbody.innerHTML = bw.map(i => `<tr>
-                <td><span class="proc-name">${esc(i.interface)}</span></td>
-                <td><span class="port-num">${fmtRate(i.recv_rate || 0)}</span></td>
-                <td><span class="port-num">${fmtRate(i.sent_rate || 0)}</span></td>
-                <td><span class="pid">${fmtBytes(i.bytes_recv || 0)}</span></td>
-                <td><span class="pid">${fmtBytes(i.bytes_sent || 0)}</span></td>
-            </tr>`).join("");
-        }
-
-        function renderEvents(data) {
-            const events = data.events || [];
-            const section = document.getElementById("events-section");
-            const list = document.getElementById("events-list");
-            if (events.length === 0) { section.style.display = "none"; return; }
-            section.style.display = "";
-            list.innerHTML = events.map(e => `<li class="event-item">
-                <span class="event-severity ${e.severity || 'info'}"></span>
-                <div class="event-content">
-                    <div class="event-message">${esc(e.message)}</div>
-                    <div class="event-meta">${esc(e.type || "")}</div>
+        <!-- Bande passante -->
+        <div class="tab-panel" id="tab-bw">
+            <div class="table-container">
+                <div class="table-header">
+                    <div><span class="table-title">Bande passante par interface</span><span class="table-count" id="bw-count"></span></div>
                 </div>
-            </li>`).join("");
-        }
+                <table>
+                    <thead><tr>
+                        <th>Interface</th><th>Download</th><th>Upload</th><th>Total recu</th><th>Total envoye</th>
+                    </tr></thead>
+                    <tbody id="bw-body"><tr><td colspan="5" class="empty-cell">--</td></tr></tbody>
+                </table>
+            </div>
+        </div>
 
-        function renderAll(data) {
-            document.getElementById("stat-conns").textContent = data.connections_total || 0;
-            document.getElementById("stat-listen").textContent = data.listening_total || 0;
-            document.getElementById("stat-events").textContent = (data.events || []).length;
-            document.getElementById("last-seen").textContent = "Dernier rapport : " + (data.iso_time || "?");
-            renderBandwidth(data);
-            renderProcessSummary(data);
-            renderListening(data);
-            renderConnections(data);
-            renderEvents(data);
-        }
+        <!-- Evenements -->
+        <div class="tab-panel" id="tab-events">
+            <div class="table-container">
+                <div class="table-header">
+                    <div><span class="table-title">Evenements detectes</span><span class="table-count" id="ev-count"></span></div>
+                    <span class="table-count" style="color:var(--text-muted);font-size:11px">Cliquer pour details</span>
+                </div>
+                <table id="ev-table">
+                    <thead><tr>
+                        <th></th><th>Severite</th><th>Message</th><th>Type</th><th>Heure</th>
+                    </tr></thead>
+                    <tbody id="ev-body"><tr><td colspan="5" class="empty-cell">Aucun evenement</td></tr></tbody>
+                </table>
+            </div>
+        </div>
 
-        async function refresh() {
-            try {
-                const resp = await fetch("/api/hosts/" + encodeURIComponent(HOSTNAME));
-                if (!resp.ok) return;
-                const data = await resp.json();
-                lastData = data;
-                renderAll(data);
-                document.getElementById("live-dot").style.background = "var(--success)";
-                document.getElementById("live-label").textContent = "Live";
-            } catch(e) {
-                document.getElementById("live-dot").style.background = "var(--danger)";
-                document.getElementById("live-label").textContent = "Offline";
-            }
-        }
+    </div>
+</div>
 
-        // Initial render from server-side data, then switch to AJAX
-        renderAll({{ host | tojson }});
-        setInterval(refresh, 5000);
+<!-- Process detail modal -->
+<div class="modal-overlay" id="proc-modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="proc-modal">
+        <div class="proc-modal-header">
+            <span class="proc-modal-title" id="modal-title">Processus</span>
+            <button class="proc-modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div class="proc-modal-body" id="modal-body">Chargement...</div>
+    </div>
+</div>
+{% endblock %}
 
-        // Clock
-        function updateClock() {
-            document.getElementById("clock").textContent =
-                new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-        }
-        updateClock();
-        setInterval(updateClock, 1000);
+{% block scripts %}
+<script>
+/* Toutes les actions Actions.* seront routées vers cet agent via la queue */
+window.TARGET_HOSTNAME = "{{ host.hostname }}";
+const HOSTNAME = "{{ host.hostname }}";
 
-        // Client-side filter
-        function setupFilter(inputId, tableId) {
-            const input = document.getElementById(inputId);
-            if (!input) return;
-            input.addEventListener("input", function() {
-                const q = this.value.toLowerCase();
-                document.querySelectorAll("#" + tableId + " tbody tr").forEach(row => {
-                    row.style.display = row.textContent.toLowerCase().includes(q) ? "" : "none";
-                });
-            });
+/* ── tab switching ── */
+function showTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelector(`[onclick="showTab('${name}')"]`).classList.add('active');
+    document.getElementById('tab-'+name).classList.add('active');
+}
+
+/* ── helpers ── */
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtRate(b){ if(b>1048576)return (b/1048576).toFixed(1)+' MB/s'; if(b>1024)return (b/1024).toFixed(1)+' KB/s'; return Math.round(b)+' B/s'; }
+function fmtBytes(b){ if(!b||b<=0)return '0 B'; if(b>1073741824)return (b/1073741824).toFixed(1)+' GB'; if(b>1048576)return (b/1048576).toFixed(1)+' MB'; if(b>1024)return (b/1024).toFixed(0)+' KB'; return b+' B'; }
+function fmtUptime(s){ if(!s||s<=0)return '-'; if(s>86400)return Math.floor(s/86400)+'j '+Math.floor((s%86400)/3600)+'h'; if(s>3600)return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m'; return Math.floor(s/60)+'m'; }
+function stateClass(s){ return {LISTEN:'state-listen',ESTABLISHED:'state-established',TIME_WAIT:'state-time-wait',CLOSE_WAIT:'state-time-wait'}[s]||'state-other'; }
+
+function cpuBar(pct){
+    const cls = pct>=80?'bar-crit':pct>=50?'bar-warn':'bar-ok';
+    return `<span class="bar-wrap"><span class="bar-bg"><span class="bar-fill ${cls}" style="width:${Math.min(pct,100)}%"></span></span><span class="pid">${pct}%</span></span>`;
+}
+function memBar(pct){
+    const cls = pct>=80?'bar-crit':pct>=50?'bar-warn':'bar-ok';
+    return `<span class="bar-wrap"><span class="bar-bg"><span class="bar-fill ${cls}" style="width:${Math.min(pct,100)}%"></span></span><span class="pid">${pct.toFixed(1)}%</span></span>`;
+}
+
+/* ── sparkline SVG ── */
+function drawSparkline(svgId, values, color){
+    const svg = document.getElementById(svgId);
+    if(!svg || values.length<2) return;
+    const W=120, H=28, pad=2;
+    const mn=Math.min(...values), mx=Math.max(...values);
+    const range=mx-mn||1;
+    const pts = values.map((v,i)=>{
+        const x = pad + (i/(values.length-1))*(W-2*pad);
+        const y = H-pad - ((v-mn)/range)*(H-2*pad);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    svg.innerHTML = `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+}
+
+/* ── render tabs ── */
+function renderListening(data){
+    const list=data.listening||[];
+    document.getElementById('listen-count').textContent=list.length+' port(s)';
+    document.getElementById('tc-ports').textContent=list.length;
+    const lbody=document.getElementById('listen-body');
+    lbody.innerHTML=list.map(c=>`<tr>
+        <td><span class="badge-proto">${esc(c.protocol)}</span></td>
+        <td><span class="proc-name">${esc(c.local_addr)}</span></td>
+        <td><span class="port-num">${c.local_port|0}</span></td>
+        <td><span class="proc-name">${esc(c.process_name||'-')}${c.service?` <span class="badge-proto">${esc(c.service)}</span>`:''}</span></td>
+        <td><span class="pid">${c.pid?esc(String(c.pid)):'-'}</span></td>
+        <td>${c.cpu_percent!==undefined?cpuBar(c.cpu_percent):'<span class="pid">-</span>'}</td>
+        <td>${c.memory_percent!==undefined?memBar(c.memory_percent):'<span class="pid">-</span>'}</td>
+        <td class="actions-cell">
+            <button class="btn-action btn-block"
+                data-action="block-port" data-port="${c.local_port|0}" data-proto="${esc(c.protocol)}">Block</button>
+            ${c.pid?`<button class="btn-action btn-kill"
+                data-action="kill-proc" data-pid="${c.pid|0}" data-name="${esc(c.process_name||'')}">Kill</button>`:''}
+            ${c.pid?`<button class="btn-action"
+                data-action="proc-detail" data-pid="${c.pid|0}" data-name="${esc(c.process_name||'')}">Detail</button>`:''}
+            ${c.service?`<button class="btn-action"
+                data-action="svc-restart" data-svc="${esc(c.service)}">Restart</button>`:''}
+        </td>
+    </tr>`).join('');
+    bindTableActions(lbody);
+}
+
+function renderConnections(data){
+    const list=data.connections||[];
+    document.getElementById('conn-count').textContent=list.length+' connexion(s)';
+    document.getElementById('tc-conns').textContent=list.length;
+    const cbody=document.getElementById('conn-body');
+    cbody.innerHTML=list.map(c=>{
+        const remoteLabel=c.remote_addr?(esc(c.remote_addr)+(c.remote_port?':'+esc(String(c.remote_port)):'')):' * ';
+        const remoteFull=c.dns_hostname?`${remoteLabel} <span class="pid">(${esc(c.dns_hostname)})</span>`:remoteLabel;
+        const canBlock=c.remote_addr&&c.remote_addr!=='127.0.0.1'&&c.remote_addr!=='::1';
+        return `<tr>
+            <td><span class="badge-proto">${esc(c.protocol)}</span></td>
+            <td><span class="proc-name">${esc(c.local_addr)}</span></td>
+            <td><span class="port-num">${c.local_port|0}</span></td>
+            <td><span class="proc-name">${remoteFull}</span></td>
+            <td><span class="${stateClass(c.status)}">${esc(c.status)}</span></td>
+            <td><span class="proc-name">${esc(c.process_name||'-')}${c.service?` <span class="badge-proto">${esc(c.service)}</span>`:''}</span></td>
+            <td><span class="pid">${c.pid?esc(String(c.pid)):'-'}</span></td>
+            <td class="actions-cell">
+                ${c.pid?`<button class="btn-action btn-kill"
+                    data-action="kill-proc" data-pid="${c.pid|0}" data-name="${esc(c.process_name||'')}">Kill</button>`:''}
+                ${c.pid?`<button class="btn-action"
+                    data-action="proc-detail" data-pid="${c.pid|0}" data-name="${esc(c.process_name||'')}">Detail</button>`:''}
+                ${canBlock?`<button class="btn-action btn-block"
+                    data-action="block-ip" data-ip="${esc(c.remote_addr)}">Block IP</button>`:''}
+            </td>
+        </tr>`;
+    }).join('');
+    bindTableActions(cbody);
+}
+
+function renderProcessSummary(data){
+    const list=(data.process_summary||[]).sort((a,b)=>(b.cpu_percent||0)-(a.cpu_percent||0));
+    document.getElementById('proc-count').textContent=list.length+' processus';
+    document.getElementById('tc-procs').textContent=list.length;
+    document.getElementById('stat-procs').textContent=list.length;
+    const pbody=document.getElementById('proc-body');
+    pbody.innerHTML=list.map(p=>`<tr>
+        <td><span class="pid">${p.pid|0}</span></td>
+        <td><span class="proc-name">${esc(p.name||'-')}</span></td>
+        <td>${p.service?`<span class="badge-proto">${esc(p.service)}</span>`:'<span class="pid">-</span>'}</td>
+        <td><span class="port-num">${p.connections_count|0}</span></td>
+        <td>${cpuBar(p.cpu_percent||0)}</td>
+        <td>${memBar(p.memory_percent||0)}</td>
+        <td><span class="pid">↓${fmtBytes(p.io_read_bytes||0)} ↑${fmtBytes(p.io_write_bytes||0)}</span></td>
+        <td><span class="pid">${fmtUptime(p.uptime_seconds)}</span></td>
+        <td class="actions-cell">
+            <button class="btn-action"
+                data-action="proc-detail" data-pid="${p.pid|0}" data-name="${esc(p.name||'')}">Detail</button>
+            <button class="btn-action btn-kill"
+                data-action="kill-proc" data-pid="${p.pid|0}" data-name="${esc(p.name||'')}">Kill</button>
+            ${p.service?`<button class="btn-action"
+                data-action="svc-restart" data-svc="${esc(p.service)}">Restart</button>`:''}
+        </td>
+    </tr>`).join('');
+}
+
+function renderBandwidth(data){
+    const bw=data.bandwidth||[];
+    document.getElementById('bw-count').textContent=bw.length+' interface(s)';
+    if(!bw.length){ document.getElementById('bw-body').innerHTML='<tr><td colspan="5" class="empty-cell">Aucune donnee</td></tr>'; document.getElementById('stat-bw').textContent='--'; return; }
+    const totalRecv=bw.reduce((s,i)=>s+(i.recv_rate||0),0);
+    const totalSent=bw.reduce((s,i)=>s+(i.sent_rate||0),0);
+    document.getElementById('stat-bw').textContent=fmtRate(totalRecv+totalSent);
+    document.getElementById('stat-bw-sub').textContent='↓'+fmtRate(totalRecv)+' ↑'+fmtRate(totalSent);
+    document.getElementById('bw-body').innerHTML=bw.map(i=>`<tr>
+        <td><span class="proc-name">${esc(i.interface)}</span></td>
+        <td><span class="port-num">${fmtRate(i.recv_rate||0)}</span></td>
+        <td><span class="port-num">${fmtRate(i.sent_rate||0)}</span></td>
+        <td><span class="pid">${fmtBytes(i.bytes_recv||0)}</span></td>
+        <td><span class="pid">${fmtBytes(i.bytes_sent||0)}</span></td>
+    </tr>`).join('');
+}
+
+function renderEvents(data){
+    const events=data.events||[];
+    document.getElementById('stat-events').textContent=events.length;
+    document.getElementById('tc-events').textContent=events.length;
+    if(events.length>0) document.getElementById('tc-events').className='tab-count tab-count-warn';
+    else document.getElementById('tc-events').className='tab-count';
+    document.getElementById('ev-count').textContent=events.length+' evenement(s)';
+    if(!events.length){ document.getElementById('ev-body').innerHTML='<tr><td colspan="5" class="empty-cell">Aucun evenement</td></tr>'; return; }
+    document.getElementById('ev-body').innerHTML=events.map((e,i)=>{
+        const detail=JSON.stringify(e,null,2);
+        return `<tr class="event-row" onclick="toggleEvent(${i})">
+            <td style="width:20px"><span style="color:var(--text-muted);font-size:10px" id="ev-arrow-${i}">▶</span></td>
+            <td><span class="event-severity ${e.severity||'info'}" style="display:inline-block"></span></td>
+            <td><span class="event-message-cell">${esc(e.message||'-')}</span></td>
+            <td><span class="badge-proto">${esc(e.type||e.event_type||'-')}</span></td>
+            <td><span class="event-time">${esc(e.iso_time||'')}</span></td>
+        </tr>
+        <tr class="event-detail-cell" id="ev-detail-${i}">
+            <td colspan="5"><div class="event-detail-box">${esc(detail)}</div></td>
+        </tr>`;
+    }).join('');
+}
+
+function toggleEvent(i){
+    const row=document.getElementById('ev-detail-'+i);
+    const arrow=document.getElementById('ev-arrow-'+i);
+    const open=row.classList.toggle('open');
+    arrow.textContent=open?'▼':'▶';
+}
+
+/* ── sparklines from history ── */
+let historyData=[];
+async function loadHistory(){
+    try{
+        const r=await fetch('/api/stats/'+encodeURIComponent(HOSTNAME));
+        if(!r.ok)return;
+        historyData=await r.json();
+        updateSparklines();
+    }catch(e){}
+}
+function updateSparklines(){
+    if(historyData.length<2)return;
+    const conns=historyData.map(h=>h.connections_total||0);
+    const listens=historyData.map(h=>h.listening_total||0);
+    drawSparkline('spark-conns',conns,'#3b82f6');
+    drawSparkline('spark-listen',listens,'#10b981');
+}
+
+/* ── event delegation — aucun onclick inline avec données agent ── */
+function bindTableActions(tbody){
+    tbody.addEventListener('click', e => {
+        const btn = e.target.closest('[data-action]');
+        if(!btn) return;
+        const a = btn.dataset.action;
+        if(a === 'block-port') Actions.blockPort(btn.dataset.port, btn.dataset.proto);
+        else if(a === 'kill-proc') Actions.killProcess(Number(btn.dataset.pid), btn.dataset.name);
+        else if(a === 'proc-detail') openProcModal(Number(btn.dataset.pid), btn.dataset.name);
+        else if(a === 'svc-restart') Actions.serviceAction(btn.dataset.svc, 'restart');
+        else if(a === 'block-ip') Actions.blockIp(btn.dataset.ip);
+    });
+}
+
+/* ── process detail modal — lit depuis le snapshot de l'agent distant ── */
+async function openProcModal(pid, name){
+    document.getElementById('modal-title').textContent=(name||'Processus')+' — PID '+pid;
+    document.getElementById('modal-body').innerHTML='<span class="pid">Chargement...</span>';
+    document.getElementById('proc-modal-overlay').classList.add('open');
+    try{
+        const r=await fetch('/api/hosts/'+encodeURIComponent(HOSTNAME)+'/process/'+pid);
+        if(!r.ok){
+            document.getElementById('modal-body').innerHTML='<span style="color:var(--danger)">Processus introuvable dans le dernier snapshot</span>';
+            return;
         }
-        setupFilter("listen-filter", "listen-table");
-        setupFilter("conn-filter", "conn-table");
-    </script>
-</body>
-</html>
+        const p=await r.json();
+        const cpu=p.cpu_percent||0, mem=p.memory_percent||0;
+        const cpuCls=cpu>=80?'bar-crit':cpu>=50?'bar-warn':'bar-ok';
+        const memCls=mem>=80?'bar-crit':mem>=50?'bar-warn':'bar-ok';
+        const body=document.getElementById('modal-body');
+        body.innerHTML=`
+        <p class="pid" style="margin-bottom:12px">Source: snapshot agent <strong>${esc(p.hostname||HOSTNAME)}</strong></p>
+        <div class="detail-grid">
+            <div class="detail-row"><span class="detail-label">PID</span><span class="detail-value">${p.pid|0}</span></div>
+            <div class="detail-row"><span class="detail-label">Nom</span><span class="detail-value">${esc(p.name||'-')}</span></div>
+            <div class="detail-row"><span class="detail-label">Service</span><span class="detail-value">${esc(p.service||'-')}</span></div>
+            <div class="detail-row"><span class="detail-label">Connexions</span><span class="detail-value">${p.connections_count|0}</span></div>
+            <div class="detail-row"><span class="detail-label">Uptime</span><span class="detail-value">${fmtUptime(p.uptime_seconds)}</span></div>
+            <div class="detail-row"><span class="detail-label">RSS</span><span class="detail-value">${fmtBytes(p.memory_rss)}</span></div>
+            <div class="detail-row">
+                <span class="detail-label">CPU</span>
+                <span class="detail-value"><span class="bar-wrap"><span class="bar-bg"><span class="bar-fill ${cpuCls}" style="width:${Math.min(cpu,100)}%"></span></span> ${cpu}%</span></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Memoire</span>
+                <span class="detail-value"><span class="bar-wrap"><span class="bar-bg"><span class="bar-fill ${memCls}" style="width:${Math.min(mem,100)}%"></span></span> ${mem.toFixed(1)}%</span></span>
+            </div>
+            <div class="detail-row"><span class="detail-label">I/O lu</span><span class="detail-value">${fmtBytes(p.io_read_bytes||0)}</span></div>
+            <div class="detail-row"><span class="detail-label">I/O ecrit</span><span class="detail-value">${fmtBytes(p.io_write_bytes||0)}</span></div>
+        </div>
+        <div style="margin-top:16px;display:flex;gap:8px">
+            <button class="btn btn-danger" id="modal-kill-term">Kill (SIGTERM)</button>
+            <button class="btn btn-cancel" id="modal-kill-kill">Kill -9 (SIGKILL)</button>
+            <button class="btn btn-cancel" id="modal-close-btn">Fermer</button>
+        </div>`;
+        // Boutons du modal sans inline onclick
+        body.querySelector('#modal-kill-term').onclick=()=>{ Actions.killProcess(p.pid,p.name); closeModal(); };
+        body.querySelector('#modal-kill-kill').onclick=()=>{ Actions.killProcess(p.pid,p.name,'SIGKILL'); closeModal(); };
+        body.querySelector('#modal-close-btn').onclick=closeModal;
+    }catch(e){ document.getElementById('modal-body').innerHTML='<span style="color:var(--danger)">Erreur: '+esc(e.message)+'</span>'; }
+}
+
+function closeModal(){ document.getElementById('proc-modal-overlay').classList.remove('open'); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeModal(); });
+
+/* ── main render + refresh ── */
+function renderAll(data){
+    document.getElementById('stat-conns').textContent=data.connections_total||0;
+    document.getElementById('stat-listen').textContent=data.listening_total||0;
+    document.getElementById('last-seen').textContent=data.iso_time||'?';
+    renderBandwidth(data);
+    renderListening(data);
+    renderProcessSummary(data);
+    renderConnections(data);
+    renderEvents(data);
+}
+
+async function refresh(){
+    try{
+        const r=await fetch('/api/hosts/'+encodeURIComponent(HOSTNAME));
+        if(!r.ok)return;
+        renderAll(await r.json());
+        document.getElementById('live-dot').style.background='var(--success)';
+        document.getElementById('live-label').textContent='Live';
+        loadHistory();
+    }catch(e){
+        document.getElementById('live-dot').style.background='var(--danger)';
+        document.getElementById('live-label').textContent='Offline';
+    }
+}
+
+function setupFilter(inputId,tableId){
+    const input=document.getElementById(inputId);
+    if(!input)return;
+    input.addEventListener('input',function(){
+        const q=this.value.toLowerCase();
+        document.querySelectorAll('#'+tableId+' tbody tr.event-row, #'+tableId+' tbody tr:not(.event-detail-cell)').forEach(row=>{
+            row.style.display=row.textContent.toLowerCase().includes(q)?'':'none';
+        });
+    });
+}
+setupFilter('listen-filter','listen-table');
+setupFilter('conn-filter','conn-table');
+
+renderAll({{ host | tojson }});
+loadHistory();
+setInterval(refresh, 5000);
+</script>
+{% endblock %}

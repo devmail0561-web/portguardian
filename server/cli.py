@@ -27,6 +27,9 @@ def main() -> None:
 
     if args.allow_remote:
         host = "0.0.0.0"
+        if args.debug:
+            print("ERREUR: --debug est interdit avec --allow-remote (debugger Werkzeug accessible depuis le réseau).")
+            sys.exit(1)
         if args.no_auth:
             print("ERREUR: --no-auth est interdit avec --allow-remote (risque de sécurité).")
             sys.exit(1)

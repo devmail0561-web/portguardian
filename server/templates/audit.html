@@ -1,74 +1,99 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PortGuardian — Audit</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
-    <meta name="csrf-token" content="{{ csrf_token }}">
-</head>
-<body>
-    <div class="app-layout">
-        <nav class="topbar">
-            <div class="topbar-brand">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-                <h1>PortGuardian<span>v{{ version }}</span></h1>
-            </div>
-            <div class="topbar-right">
-                <a href="/" class="nav-link">Dashboard</a>
-                <a href="/events" class="nav-link">Events</a>
-                <a href="/audit" class="nav-link active">Audit</a>
-                <a href="/logout" class="nav-link logout">Logout</a>
-            </div>
-        </nav>
+{% extends "base.html" %}
+{% block title %}Audit{% endblock %}
 
-        <main class="main-content">
-            <div class="section-header">
-                <h2>Journal d'audit</h2>
-                <span class="badge">{{ entries|length }} action(s)</span>
-            </div>
+{% block content %}
+<div class="breadcrumb">
+    <a href="/">Dashboard</a>
+    <span class="breadcrumb-sep">&#x203a;</span>
+    <span class="breadcrumb-current">Audit</span>
+</div>
 
-            <div class="table-container">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Utilisateur</th>
-                            <th>Action</th>
-                            <th>Paramètres</th>
-                            <th>Résultat</th>
-                            <th>Statut</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for entry in entries %}
-                        <tr>
-                            <td class="mono">{{ entry.iso_time }}</td>
-                            <td>{{ entry.user }}</td>
-                            <td><span class="badge badge-action">{{ entry.action }}</span></td>
-                            <td class="mono">{{ entry.params }}</td>
-                            <td>{{ entry.result[:80] }}</td>
-                            <td>
-                                {% if entry.success %}
-                                <span class="badge badge-success">OK</span>
-                                {% else %}
-                                <span class="badge badge-error">FAIL</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                        {% if not entries %}
-                        <tr><td colspan="6" class="empty">Aucune action enregistrée</td></tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
-        </main>
+<div class="page-header">
+    <div>
+        <h2 class="page-title">Journal d'audit</h2>
+        <p class="page-subtitle" id="audit-subtitle">{{ entries|length }} action{{ 's' if entries|length > 1 }}</p>
     </div>
-</body>
-</html>
+    <div class="table-actions">
+        <input type="text" class="table-filter" placeholder="Filtrer..." id="audit-filter">
+    </div>
+</div>
+
+<div class="table-container">
+    <table id="audit-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Source</th>
+                <th>Action</th>
+                <th>Parametres</th>
+                <th>Resultat</th>
+                <th>Statut</th>
+            </tr>
+        </thead>
+        <tbody id="audit-body">
+            {% for entry in entries %}
+            <tr>
+                <td class="mono">{{ entry.iso_time }}</td>
+                <td>{{ entry.user }}</td>
+                <td><span class="badge-action">{{ entry.action }}</span></td>
+                <td class="mono">{{ entry.params }}</td>
+                <td>{{ entry.result[:80] if entry.result else '' }}</td>
+                <td>
+                    {% if entry.success %}
+                    <span class="badge badge-success-sm">OK</span>
+                    {% else %}
+                    <span class="badge badge-error-sm">FAIL</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not entries %}
+            <tr><td colspan="6" class="empty-cell">Aucune action enregistree</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let _auditFilter = '';
+    const filter = document.getElementById('audit-filter');
+    if (filter) {
+        filter.addEventListener('input', function() {
+            _auditFilter = this.value.toLowerCase();
+            applyAuditFilter();
+        });
+    }
+    function applyAuditFilter() {
+        document.querySelectorAll('#audit-table tbody tr').forEach(row => {
+            row.style.display = row.textContent.toLowerCase().includes(_auditFilter) ? '' : 'none';
+        });
+    }
+
+    async function refreshAudit() {
+        try {
+            const resp = await fetch('/api/audit?limit=100');
+            if (!resp.ok) return;
+            const entries = await resp.json();
+            const tbody = document.getElementById('audit-body');
+            document.getElementById('audit-subtitle').textContent = entries.length + ' action' + (entries.length > 1 ? 's' : '');
+            if (entries.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-cell">Aucune action enregistree</td></tr>';
+                return;
+            }
+            function esc(s) { return String(s||'').replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+            tbody.innerHTML = entries.map(e => `<tr>
+                <td class="mono">${esc(e.iso_time)}</td>
+                <td>${esc(e.user)}</td>
+                <td><span class="badge-action">${esc(e.action)}</span></td>
+                <td class="mono">${esc(typeof e.params === 'object' ? JSON.stringify(e.params) : e.params)}</td>
+                <td>${esc(String(e.result||'').substring(0, 80))}</td>
+                <td>${e.success ? '<span class="badge badge-success-sm">OK</span>' : '<span class="badge badge-error-sm">FAIL</span>'}</td>
+            </tr>`).join('');
+            applyAuditFilter();
+        } catch(e) {}
+    }
+    setInterval(refreshAudit, 5000);
+</script>
+{% endblock %}
