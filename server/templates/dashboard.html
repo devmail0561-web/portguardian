@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
+    <meta name="csrf-token" content="{{ csrf_token }}">
 </head>
 <body>
     <div class="app-layout">
@@ -17,7 +18,7 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                 </svg>
-                <h1>PortGuardian<span>v0.2</span></h1>
+                <h1>PortGuardian<span>v{{ version }}</span></h1>
             </div>
             <div class="topbar-right">
                 <div class="refresh-indicator">
@@ -25,6 +26,9 @@
                     <span>Live</span>
                 </div>
                 <span class="topbar-time" id="clock"></span>
+                <a href="/firewall" class="nav-link">Firewall</a>
+                <a href="/audit" class="nav-link">Audit</a>
+                <a href="/logout" class="nav-link logout">Logout</a>
             </div>
         </nav>
 
@@ -270,8 +274,30 @@
             });
         }
 
-        // Auto-refresh
-        setTimeout(() => location.reload(), 15000);
+        // Auto-refresh (AJAX)
+        async function refreshDashboard() {
+            try {
+                const resp = await fetch('/api/hosts');
+                if (!resp.ok) return;
+                const hosts = await resp.json();
+                const tbody = document.querySelector('#hosts-table tbody');
+                if (!tbody) return;
+                tbody.innerHTML = hosts.map(h => {
+                    const age = (Date.now() / 1000) - (h.timestamp || 0);
+                    const status = age < 120 ? 'online' : age < 600 ? 'stale' : 'offline';
+                    return `<tr>
+                        <td><span class="badge badge-${status}"><span class="badge-dot"></span>${status}</span></td>
+                        <td><a href="/host/${h.hostname}" class="host-link">${h.hostname}</a></td>
+                        <td><span class="port-num">${h.connections_total}</span></td>
+                        <td><span class="port-num">${h.listening_total}</span></td>
+                        <td>${h.events_count > 0 ? `<span class="badge badge-stale">${h.events_count}</span>` : '<span class="pid">0</span>'}</td>
+                        <td><span class="event-time">${h.last_seen}</span></td>
+                    </tr>`;
+                }).join('');
+            } catch(e) {}
+        }
+        setInterval(refreshDashboard, 5000);
     </script>
+    <script src="/static/actions.js"></script>
 </body>
 </html>

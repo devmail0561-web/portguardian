@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PortGuardian — Connexion</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .login-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .login-box {
+            background: var(--card-bg, #1a1d23);
+            border: 1px solid var(--border, #2d3139);
+            border-radius: 12px;
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 380px;
+        }
+        .login-box h1 {
+            text-align: center;
+            margin-bottom: 0.5rem;
+            font-size: 1.5rem;
+        }
+        .login-box h1 span {
+            font-size: 0.7rem;
+            opacity: 0.5;
+            margin-left: 0.5rem;
+        }
+        .login-box .subtitle {
+            text-align: center;
+            color: var(--text-muted, #6b7280);
+            font-size: 0.85rem;
+            margin-bottom: 2rem;
+        }
+        .login-box label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: var(--text-muted, #9ca3af);
+        }
+        .login-box input[type="password"] {
+            width: 100%;
+            padding: 0.7rem 1rem;
+            border: 1px solid var(--border, #2d3139);
+            border-radius: 8px;
+            background: var(--bg, #0f1115);
+            color: var(--text, #e5e7eb);
+            font-size: 0.95rem;
+            font-family: inherit;
+            margin-bottom: 1.5rem;
+            box-sizing: border-box;
+        }
+        .login-box input[type="password"]:focus {
+            outline: none;
+            border-color: var(--primary, #6366f1);
+        }
+        .login-box button {
+            width: 100%;
+            padding: 0.7rem;
+            border: none;
+            border-radius: 8px;
+            background: var(--primary, #6366f1);
+            color: #fff;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .login-box button:hover {
+            opacity: 0.9;
+        }
+        .login-error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #f87171;
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <h1>PortGuardian<span>v{{ version }}</span></h1>
+            <p class="subtitle">Surveillance des ports et services</p>
+            {% if error %}
+            <div class="login-error">{{ error }}</div>
+            {% endif %}
+            <form method="POST" action="/login">
+                <label for="password">Mot de passe</label>
+                <input type="password" id="password" name="password" autofocus required>
+                <button type="submit">Se connecter</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

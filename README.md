@@ -83,8 +83,11 @@ cd portguardian/
 # Scan avec export JSON
 ./portguardian scan --format json --output /tmp/ports.json
 
-# Lancer le serveur web
-./portguardian server --port 8600
+# Lancer le serveur web (mode local sans auth — usage educatif)
+./portguardian server --no-auth
+
+# Lancer le serveur web (mode securise avec mot de passe)
+./portguardian server --password monmotdepasse
 
 # Lancer l'agent daemon
 ./portguardian agent run --server http://monitor:8600
@@ -99,19 +102,30 @@ cd portguardian/
 |----------|-------------|
 | `./portguardian` | Lance le TUI interactif (mode par defaut) |
 | `./portguardian tui` | Idem |
-| `./portguardian server [options]` | Lance le dashboard web |
+| `./portguardian server [options]` | Lance le dashboard web (--no-auth ou --password requis) |
 | `./portguardian agent <run\|once\|init>` | Lance l'agent daemon |
 | `./portguardian scan [options]` | Scan unique (CLI) |
 | `./portguardian help` | Affiche l'aide |
 
-### Deploiement multi-machines
+### Usage local (etudiant / decouverte)
+
+```bash
+# Tout-en-un : serveur + agent sur la meme machine, sans auth
+./portguardian server --no-auth &
+./portguardian agent run --server http://127.0.0.1:8600
+
+# Ouvrir le dashboard dans le navigateur :
+# http://127.0.0.1:8600
+```
+
+### Deploiement multi-machines (production)
 
 ```bash
 # Sur le serveur central :
-./portguardian server --port 8600 --api-key SECRET
+./portguardian server --password SECRET --api-key CLE_AGENT --allow-remote
 
 # Sur chaque machine a surveiller :
-./portguardian agent run --server http://serveur:8600 --api-key SECRET
+./portguardian agent run --server http://serveur:8600 --api-key CLE_AGENT
 
 # Installer en service systemd (optionnel) :
 sudo cp daemon/portguardian-agent.service /etc/systemd/system/
@@ -261,25 +275,56 @@ Gestion des services systemd associes aux processus directement depuis l'interfa
 
 ### Dashboard web multi-machines
 
-Serveur web centralise qui recoit les rapports des agents et expose un dashboard temps reel.
+Serveur web centralise qui recoit les rapports des agents et expose un dashboard temps reel avec actions d'administration.
 
 - Vue d'ensemble : nombre de machines, connexions totales, ports en ecoute, evenements
-- Detail par machine : ports en ecoute, connexions, evenements, bande passante
+- Detail par machine : ports en ecoute, connexions, bande passante par interface, processus reseau (CPU, memoire, I/O)
 - Page evenements dediee avec filtrage
-- Auto-refresh toutes les 15 secondes
+- **Page Firewall** : consultation des regles actives, blocage de ports/IP depuis le navigateur
+- **Page Audit** : journal de toutes les actions effectuees
+- **Actions depuis le dashboard** : kill processus, bloquer port/IP, gerer services systemd
+- **Commandes a distance** : envoyer des commandes aux agents depuis le dashboard (kill, block, service)
+- Auto-refresh AJAX toutes les 5 secondes (pas de rechargement de page)
+- DNS inverse sur les connexions distantes
+- Service systemd associe a chaque port
 - Theme dark
 - Section "Deployer un agent" avec commandes copiables
-- API REST pour integration
+
+#### Securite
+
+| Mode | Commande | Usage |
+|------|----------|-------|
+| Local sans auth | `--no-auth` | Apprentissage, tests (localhost uniquement) |
+| Mot de passe | `--password <mdp>` | Production locale |
+| Multi-machines | `--password <mdp> --api-key <cle> --allow-remote` | Production reseau |
+
+- Authentification obligatoire sur toutes les pages (sauf `--no-auth`)
+- `--no-auth` refuse de se combiner avec `--allow-remote`
+- Protection CSRF sur les endpoints d'action
+- Rate limiting (10 actions/min/IP)
+- Audit log de chaque action (fichier + memoire)
+- Bind `127.0.0.1` par defaut
 
 #### API REST
 
 | Endpoint | Methode | Description |
 |----------|---------|-------------|
 | `/api/report` | POST | Reception des snapshots agents |
+| `/api/heartbeat` | POST | Heartbeat agent (statut de connexion) |
 | `/api/hosts` | GET | Liste des machines |
-| `/api/hosts/<hostname>` | GET | Detail d'une machine |
+| `/api/hosts/<hostname>` | GET | Detail complet d'une machine |
 | `/api/hosts/<hostname>/history` | GET | Historique d'une machine |
 | `/api/events` | GET | Evenements globaux recents |
+| `/api/firewall/rules` | GET | Regles firewall actives |
+| `/api/audit` | GET | Journal d'audit des actions |
+| `/api/commands/<hostname>` | GET | Commandes en attente pour un agent |
+| `/api/commands/<hostname>` | POST | Envoyer une commande a un agent |
+| `/api/actions/kill` | POST | Tuer un processus |
+| `/api/actions/block-port` | POST | Bloquer un port |
+| `/api/actions/unblock-port` | POST | Debloquer un port |
+| `/api/actions/block-ip` | POST | Bloquer une IP |
+| `/api/actions/unblock-ip` | POST | Debloquer une IP |
+| `/api/actions/service` | POST | Gerer un service systemd |
 
 ---
 
@@ -334,15 +379,19 @@ portguardian/
 │   ├── permissions.py          # Verification des privileges root
 │   └── logs.py                 # Logging applicatif
 ├── daemon/                     # Agent autonome
-│   ├── agent.py                # Collecte periodique + detection
+│   ├── agent.py                # Collecte complete + retry + pull commandes
 │   ├── config.py               # Configuration daemon
 │   ├── notifier.py             # Notifications (Slack, email, webhook)
 │   └── cli.py                  # CLI du daemon
 ├── server/                     # Serveur web
-│   ├── app.py                  # API Flask + dashboard
+│   ├── app.py                  # API Flask + dashboard + actions
 │   ├── cli.py                  # CLI du serveur
-│   ├── templates/              # Templates HTML (dashboard, host, events)
-│   └── static/style.css        # Theme dark
+│   ├── auth.py                 # Authentification, sessions, CSRF
+│   ├── actions.py              # Endpoints d'action (kill, block, service)
+│   ├── ratelimit.py            # Rate limiting par IP
+│   ├── audit.py                # Journal d'audit des actions
+│   ├── templates/              # Templates HTML (dashboard, host, events, firewall, audit, login)
+│   └── static/                 # CSS + JS (actions.js)
 ├── ui/                         # Composants TUI
 │   ├── dashboard.py            # Layout principal
 │   ├── tables.py               # Tableau interactif
@@ -368,6 +417,9 @@ portguardian/
 | `~/.config/portguardian/filters.json` | Filtres de recherche |
 | `~/.config/portguardian/daemon.json` | Configuration agent |
 | `~/.local/share/portguardian/baseline.json` | Snapshot baseline |
+| `~/.config/portguardian/server_password.hash` | Hash du mot de passe web |
+| `~/.config/portguardian/server_secret.key` | Cle secrete des sessions |
+| `~/.config/portguardian/logs/audit.jsonl` | Journal d'audit des actions |
 | `~/.local/share/portguardian/daemon/latest.json` | Dernier snapshot agent |
 
 ---
@@ -401,15 +453,24 @@ sudo ln -s /chemin/vers/portguardian/portguardian /usr/local/bin/portguardian
 
 ### v0.3
 
-- **Blocage d'adresses IP** — nouvelle fonctionnalite : blocage/deblocage d'IPs (IPv4, IPv6, CIDR) via touche `i`, support des 4 backends firewall
+- **Securite du serveur web** — authentification obligatoire (mot de passe + sessions signees), protection CSRF, rate limiting, audit log
+- **Mode `--no-auth`** — acces libre pour usage local/educatif (localhost uniquement, refuse de se combiner avec `--allow-remote`)
+- **Actions depuis le dashboard** — kill processus, bloquer/debloquer ports et IPs, gerer services systemd, tout depuis le navigateur avec confirmation
+- **Page Firewall** — consultation des regles actives, formulaires de blocage, detection du backend
+- **Page Audit** — journal horodate de toutes les actions effectuees
+- **Commandes a distance** — envoyer des ordres aux agents depuis le dashboard (kill, block, service) via queue de commandes
+- **Agent enrichi** — collecte CPU/memoire/I/O par processus, resolution DNS inverse, detection services systemd, metriques systeme globales
+- **Agent fiable** — queue locale (max 100 snapshots), retry avec backoff exponentiel, flush automatique quand le serveur revient, heartbeat
+- **Rotation historique** — par nombre de fichiers ET par taille totale (max 100 MB)
+- **Dashboard fluide** — refresh AJAX toutes les 5s sans rechargement de page, rendu cote client
+- **Section processus reseau** — vue consolidee par processus (CPU, memoire, I/O, uptime, service, nombre de connexions)
+- **Bande passante par interface** — download/upload en temps reel + totaux cumules
+- **Blocage d'adresses IP** — blocage/deblocage d'IPs (IPv4, IPv6, CIDR) via touche `i`, support des 4 backends firewall
 - **Script unifie `./portguardian`** — remplace les multiples commandes `python3 -m ...` par un point d'entree unique (tui, server, agent, scan, help)
 - **Corrections firewall** — fix iptables `--dport` sur OUTPUT, fix syntaxe rich rule firewalld, fix match exact nftables, fix deblocage bidirectionnel ufw
 - **Persistance nftables** — les regles sont sauvegardees dans `/etc/nftables.d/portguardian.nft` pour survivre au reboot
 - **Fix watcher** — suppression du raccourci par comptage qui masquait les changements simultanes (port ouvert + port ferme en meme temps)
-- **Page evenements web** — nouveau template HTML `/events` (la navigation ne renvoie plus de JSON)
-- **Section deploiement** — instructions de deploiement d'agent avec commandes copiables dans le dashboard
-- **Sidebar nettoyee** — suppression des liens API bruts de la navigation
-- **README refait** — table des matieres, screenshots par fonctionnalite, commandes unifiees
+- **Bind `127.0.0.1` par defaut** — le serveur n'est plus expose au reseau sans opt-in explicite (`--allow-remote`)
 
 ### v0.2
 

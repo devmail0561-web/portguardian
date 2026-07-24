@@ -35,6 +35,7 @@ class DaemonConfig:
     data_dir: str = ""
     keep_history: bool = True
     max_history_files: int = 1440  # 24h à 1 snapshot/min
+    max_history_size_mb: int = 100  # taille max du répertoire history
 
     def __post_init__(self) -> None:
         if not self.data_dir:

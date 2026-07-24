@@ -8,59 +8,46 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
+    <meta name="csrf-token" content="{{ csrf_token }}">
 </head>
 <body>
     <div class="app-layout">
-        <!-- Top bar -->
         <nav class="topbar">
             <div class="topbar-brand">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                 </svg>
-                <h1>PortGuardian<span>v0.2</span></h1>
+                <h1>PortGuardian<span>v{{ version }}</span></h1>
             </div>
             <div class="topbar-right">
                 <div class="refresh-indicator">
-                    <span class="dot"></span>
-                    <span>Live</span>
+                    <span class="dot" id="live-dot"></span>
+                    <span id="live-label">Live</span>
                 </div>
                 <span class="topbar-time" id="clock"></span>
+                <a href="/firewall" class="nav-link">Firewall</a>
+                <a href="/audit" class="nav-link">Audit</a>
+                <a href="/logout" class="nav-link logout">Logout</a>
             </div>
         </nav>
 
-        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-section">
-                <div class="sidebar-section-title">Monitoring</div>
+                <div class="sidebar-section-title">Navigation</div>
                 <ul class="sidebar-nav">
-                    <li>
-                        <a href="/">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-                            Dashboard
-                        </a>
-                    </li>
-                    <li>
-                        <a href="/events">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                            Evenements
-                        </a>
-                    </li>
+                    <li><a href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard</a></li>
+                    <li><a href="/events"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Evenements</a></li>
+                    <li><a href="/firewall"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Firewall</a></li>
                 </ul>
             </div>
             <div class="sidebar-section">
                 <div class="sidebar-section-title">Machine</div>
                 <ul class="sidebar-nav">
-                    <li>
-                        <a href="/host/{{ host.hostname }}" class="active">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                            {{ host.hostname }}
-                        </a>
-                    </li>
+                    <li><a href="/host/{{ host.hostname }}" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>{{ host.hostname }}</a></li>
                 </ul>
             </div>
         </aside>
 
-        <!-- Main -->
         <main class="main-content">
             <div class="breadcrumb">
                 <a href="/">Dashboard</a>
@@ -71,52 +58,68 @@
             <div class="page-header">
                 <div>
                     <h2 class="page-title">{{ host.hostname }}</h2>
-                    <p class="page-subtitle">Dernier rapport : {{ host.iso_time }}</p>
+                    <p class="page-subtitle" id="last-seen">Dernier rapport : {{ host.iso_time }}</p>
                 </div>
             </div>
 
             <!-- Stats -->
-            <div class="stats-grid">
+            <div class="stats-grid" id="stats-grid">
                 <div class="stat-card">
                     <div class="stat-card-header">
                         <span class="stat-card-label">Connexions</span>
-                        <div class="stat-card-icon blue">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                        </div>
+                        <div class="stat-card-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
                     </div>
-                    <div class="stat-card-value">{{ host.connections_total }}</div>
-                    <div class="stat-card-sub">connexions actives</div>
+                    <div class="stat-card-value" id="stat-conns">{{ host.connections_total }}</div>
+                    <div class="stat-card-sub">actives</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-header">
-                        <span class="stat-card-label">Ports en ecoute</span>
-                        <div class="stat-card-icon green">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                        </div>
+                        <span class="stat-card-label">Ports LISTEN</span>
+                        <div class="stat-card-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
                     </div>
-                    <div class="stat-card-value">{{ host.listening_total }}</div>
-                    <div class="stat-card-sub">ports LISTEN</div>
+                    <div class="stat-card-value" id="stat-listen">{{ host.listening_total }}</div>
+                    <div class="stat-card-sub">en ecoute</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-header">
                         <span class="stat-card-label">Evenements</span>
-                        <div class="stat-card-icon yellow">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                        </div>
+                        <div class="stat-card-icon yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
                     </div>
-                    <div class="stat-card-value">{{ host.events|length if host.events else 0 }}</div>
+                    <div class="stat-card-value" id="stat-events">{{ host.events|length if host.events else 0 }}</div>
                     <div class="stat-card-sub">depuis dernier scan</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-header">
                         <span class="stat-card-label">Bande passante</span>
-                        <div class="stat-card-icon red">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="4"/><polyline points="6 10 12 4 18 10"/></svg>
-                        </div>
+                        <div class="stat-card-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="4"/><polyline points="6 10 12 4 18 10"/></svg></div>
                     </div>
-                    <div class="stat-card-value">{{ host.bandwidth|length if host.bandwidth else 0 }}</div>
-                    <div class="stat-card-sub">interfaces reseau</div>
+                    <div class="stat-card-value" id="stat-bw">—</div>
+                    <div class="stat-card-sub" id="stat-bw-sub">total interfaces</div>
                 </div>
+            </div>
+
+            <!-- Bandwidth -->
+            <div class="table-container" id="bw-section">
+                <div class="table-header">
+                    <div>
+                        <span class="table-title">Bande passante par interface</span>
+                        <span class="table-count" id="bw-count"></span>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Interface</th>
+                            <th>Download</th>
+                            <th>Upload</th>
+                            <th>Total recu</th>
+                            <th>Total envoye</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bw-body">
+                        <tr><td colspan="5" class="empty-cell">—</td></tr>
+                    </tbody>
+                </table>
             </div>
 
             <!-- Listening ports -->
@@ -124,7 +127,7 @@
                 <div class="table-header">
                     <div>
                         <span class="table-title">Ports en ecoute</span>
-                        <span class="table-count">{{ host.listening|length }} port{{ 's' if host.listening|length > 1 }}</span>
+                        <span class="table-count" id="listen-count"></span>
                     </div>
                     <div class="table-actions">
                         <input type="text" class="table-filter" placeholder="Filtrer..." id="listen-filter">
@@ -133,24 +136,41 @@
                 <table id="listen-table">
                     <thead>
                         <tr>
-                            <th>Protocole</th>
+                            <th>Proto</th>
                             <th>Adresse</th>
                             <th>Port</th>
                             <th>Processus</th>
                             <th>PID</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        {% for c in host.listening %}
+                    <tbody id="listen-body"></tbody>
+                </table>
+            </div>
+
+            <!-- Process summary -->
+            <div class="table-container">
+                <div class="table-header">
+                    <div>
+                        <span class="table-title">Processus reseau</span>
+                        <span class="table-count" id="proc-count"></span>
+                    </div>
+                </div>
+                <table id="proc-table">
+                    <thead>
                         <tr>
-                            <td><span class="badge-proto">{{ c.protocol }}</span></td>
-                            <td><span class="proc-name">{{ c.local_addr }}</span></td>
-                            <td><span class="port-num">{{ c.local_port }}</span></td>
-                            <td><span class="proc-name">{{ c.process_name or '-' }}</span></td>
-                            <td><span class="pid">{{ c.pid or '-' }}</span></td>
+                            <th>PID</th>
+                            <th>Processus</th>
+                            <th>Service</th>
+                            <th>Connexions</th>
+                            <th>CPU</th>
+                            <th>Memoire</th>
+                            <th>I/O (R/W)</th>
+                            <th>Uptime</th>
+                            <th>Actions</th>
                         </tr>
-                        {% endfor %}
-                    </tbody>
+                    </thead>
+                    <tbody id="proc-body"></tbody>
                 </table>
             </div>
 
@@ -158,8 +178,8 @@
             <div class="table-container">
                 <div class="table-header">
                     <div>
-                        <span class="table-title">Toutes les connexions</span>
-                        <span class="table-count">{{ host.connections|length }} connexion{{ 's' if host.connections|length > 1 }}</span>
+                        <span class="table-title">Connexions actives</span>
+                        <span class="table-count" id="conn-count"></span>
                     </div>
                     <div class="table-actions">
                         <input type="text" class="table-filter" placeholder="Filtrer..." id="conn-filter">
@@ -169,88 +189,222 @@
                     <thead>
                         <tr>
                             <th>Proto</th>
-                            <th>Adresse locale</th>
+                            <th>Local</th>
                             <th>Port</th>
-                            <th>Adresse distante</th>
+                            <th>Distant</th>
                             <th>Etat</th>
                             <th>Processus</th>
                             <th>PID</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        {% for c in host.connections %}
-                        <tr>
-                            <td><span class="badge-proto">{{ c.protocol }}</span></td>
-                            <td><span class="proc-name">{{ c.local_addr }}</span></td>
-                            <td><span class="port-num">{{ c.local_port }}</span></td>
-                            <td><span class="proc-name">{{ c.remote_addr or '*' }}{% if c.remote_port %}:{{ c.remote_port }}{% endif %}</span></td>
-                            <td>
-                                {% if c.status == 'LISTEN' %}
-                                <span class="state-listen">{{ c.status }}</span>
-                                {% elif c.status == 'ESTABLISHED' %}
-                                <span class="state-established">{{ c.status }}</span>
-                                {% elif c.status in ('TIME_WAIT', 'CLOSE_WAIT') %}
-                                <span class="state-time-wait">{{ c.status }}</span>
-                                {% else %}
-                                <span class="state-other">{{ c.status }}</span>
-                                {% endif %}
-                            </td>
-                            <td><span class="proc-name">{{ c.process_name or '-' }}</span></td>
-                            <td><span class="pid">{{ c.pid or '-' }}</span></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
+                    <tbody id="conn-body"></tbody>
                 </table>
             </div>
 
             <!-- Events -->
-            {% if host.events %}
-            <div class="events-panel">
+            <div class="events-panel" id="events-section" style="display:none">
                 <div class="events-header">
                     <span class="events-title">Evenements detectes</span>
                 </div>
-                <ul class="events-list">
-                    {% for event in host.events %}
-                    <li class="event-item">
-                        <span class="event-severity {{ event.severity }}"></span>
-                        <div class="event-content">
-                            <div class="event-message">{{ event.message }}</div>
-                            <div class="event-meta">{{ event.type }}</div>
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>
+                <ul class="events-list" id="events-list"></ul>
             </div>
-            {% endif %}
         </main>
     </div>
 
+    <script src="/static/actions.js"></script>
     <script>
+        const HOSTNAME = "{{ host.hostname }}";
+        let lastData = null;
+
+        function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+        function fmtRate(bytesPerSec) {
+            if (bytesPerSec > 1048576) return (bytesPerSec / 1048576).toFixed(1) + " MB/s";
+            if (bytesPerSec > 1024) return (bytesPerSec / 1024).toFixed(1) + " KB/s";
+            return Math.round(bytesPerSec) + " B/s";
+        }
+
+        function fmtBytes(b) {
+            if (b > 1073741824) return (b / 1073741824).toFixed(1) + " GB";
+            if (b > 1048576) return (b / 1048576).toFixed(1) + " MB";
+            if (b > 1024) return (b / 1024).toFixed(0) + " KB";
+            return b + " B";
+        }
+
+        function stateClass(status) {
+            if (status === "LISTEN") return "state-listen";
+            if (status === "ESTABLISHED") return "state-established";
+            if (status === "TIME_WAIT" || status === "CLOSE_WAIT") return "state-time-wait";
+            return "state-other";
+        }
+
+        function fmtUptime(sec) {
+            if (!sec || sec <= 0) return "-";
+            if (sec > 86400) return Math.floor(sec / 86400) + "j";
+            if (sec > 3600) return Math.floor(sec / 3600) + "h";
+            return Math.floor(sec / 60) + "m";
+        }
+
+        function renderListening(data) {
+            const list = data.listening || [];
+            document.getElementById("listen-count").textContent = list.length + " port(s)";
+            const tbody = document.getElementById("listen-body");
+            tbody.innerHTML = list.map(c => `<tr>
+                <td><span class="badge-proto">${esc(c.protocol)}</span></td>
+                <td><span class="proc-name">${esc(c.local_addr)}</span></td>
+                <td><span class="port-num">${c.local_port}</span></td>
+                <td><span class="proc-name">${esc(c.process_name || "-")}${c.service ? ` <span class="badge-proto">${esc(c.service)}</span>` : ""}</span></td>
+                <td><span class="pid">${c.pid || "-"}</span></td>
+                <td class="actions-cell">
+                    <button class="btn-action btn-block" onclick="Actions.blockPort('${c.local_port}','${c.protocol}')" title="Bloquer">Block</button>
+                    ${c.pid ? `<button class="btn-action btn-kill" onclick="Actions.killProcess(${c.pid},'${esc(c.process_name||"")}')" title="SIGTERM">Kill</button>` : ""}
+                    ${c.service ? `<button class="btn-action" onclick="Actions.serviceAction('${esc(c.service)}','restart')" title="Restart service">Restart</button>` : ""}
+                </td>
+            </tr>`).join("");
+        }
+
+        function renderProcessSummary(data) {
+            const list = data.process_summary || [];
+            document.getElementById("proc-count").textContent = list.length + " processus";
+            const tbody = document.getElementById("proc-body");
+            const sorted = list.sort((a, b) => (b.cpu_percent || 0) - (a.cpu_percent || 0));
+            tbody.innerHTML = sorted.map(p => `<tr>
+                <td><span class="pid">${p.pid}</span></td>
+                <td><span class="proc-name">${esc(p.name || "-")}</span></td>
+                <td>${p.service ? `<span class="badge-proto">${esc(p.service)}</span>` : '<span class="pid">-</span>'}</td>
+                <td><span class="port-num">${p.connections_count || 0}</span></td>
+                <td><span class="${(p.cpu_percent||0) > 50 ? 'state-listen' : 'pid'}">${p.cpu_percent !== undefined ? p.cpu_percent + "%" : "-"}</span></td>
+                <td><span class="pid">${p.memory_rss ? fmtBytes(p.memory_rss) : "-"} (${p.memory_percent || 0}%)</span></td>
+                <td><span class="pid">R:${fmtBytes(p.io_read_bytes||0)} W:${fmtBytes(p.io_write_bytes||0)}</span></td>
+                <td><span class="pid">${fmtUptime(p.uptime_seconds)}</span></td>
+                <td class="actions-cell">
+                    <button class="btn-action btn-kill" onclick="Actions.killProcess(${p.pid},'${esc(p.name||"")}')" title="SIGTERM">Kill</button>
+                    ${p.service ? `<button class="btn-action" onclick="Actions.serviceAction('${esc(p.service)}','restart')" title="Restart">Restart</button>` : ""}
+                </td>
+            </tr>`).join("");
+        }
+
+        function renderConnections(data) {
+            const list = data.connections || [];
+            document.getElementById("conn-count").textContent = list.length + " connexion(s)";
+            const tbody = document.getElementById("conn-body");
+            tbody.innerHTML = list.map(c => {
+                const remoteHost = c.dns_hostname || "";
+                const remoteLabel = c.remote_addr ? (c.remote_addr + (c.remote_port ? ":" + c.remote_port : "")) : "*";
+                const remoteFull = remoteHost ? `${remoteLabel} <span class="pid">(${esc(remoteHost)})</span>` : remoteLabel;
+                const canBlockIp = c.remote_addr && c.remote_addr !== "127.0.0.1" && c.remote_addr !== "::1" && c.remote_addr !== "";
+                const cpuLabel = c.cpu_percent !== undefined ? `${c.cpu_percent}%` : "";
+                const memLabel = c.memory_rss ? fmtBytes(c.memory_rss) : "";
+                const ioLabel = c.io_read_bytes || c.io_write_bytes ? `R:${fmtBytes(c.io_read_bytes||0)} W:${fmtBytes(c.io_write_bytes||0)}` : "";
+                return `<tr>
+                    <td><span class="badge-proto">${esc(c.protocol)}</span></td>
+                    <td><span class="proc-name">${esc(c.local_addr)}</span></td>
+                    <td><span class="port-num">${c.local_port}</span></td>
+                    <td><span class="proc-name">${remoteFull}</span></td>
+                    <td><span class="${stateClass(c.status)}">${esc(c.status)}</span></td>
+                    <td><span class="proc-name">${esc(c.process_name || "-")}${c.service ? ` <span class="badge-proto">${esc(c.service)}</span>` : ""}</span>
+                        ${cpuLabel || memLabel ? `<br><span class="pid">${cpuLabel} ${memLabel} ${ioLabel}</span>` : ""}
+                    </td>
+                    <td><span class="pid">${c.pid || "-"}</span></td>
+                    <td class="actions-cell">
+                        ${c.pid ? `<button class="btn-action btn-kill" onclick="Actions.killProcess(${c.pid},'${esc(c.process_name||"")}')" title="SIGTERM">Kill</button>` : ""}
+                        ${canBlockIp ? `<button class="btn-action btn-block" onclick="Actions.blockIp('${esc(c.remote_addr)}')" title="Bloquer IP">Block IP</button>` : ""}
+                    </td>
+                </tr>`;
+            }).join("");
+        }
+
+        function renderBandwidth(data) {
+            const bw = data.bandwidth || [];
+            document.getElementById("bw-count").textContent = bw.length + " interface(s)";
+            if (bw.length === 0) {
+                document.getElementById("bw-body").innerHTML = '<tr><td colspan="5" class="empty-cell">Aucune donnee</td></tr>';
+                document.getElementById("stat-bw").textContent = "—";
+                return;
+            }
+            const totalRecv = bw.reduce((s, i) => s + (i.recv_rate || 0), 0);
+            const totalSent = bw.reduce((s, i) => s + (i.sent_rate || 0), 0);
+            document.getElementById("stat-bw").textContent = fmtRate(totalRecv + totalSent);
+            document.getElementById("stat-bw-sub").textContent = "↓" + fmtRate(totalRecv) + " ↑" + fmtRate(totalSent);
+
+            const tbody = document.getElementById("bw-body");
+            tbody.innerHTML = bw.map(i => `<tr>
+                <td><span class="proc-name">${esc(i.interface)}</span></td>
+                <td><span class="port-num">${fmtRate(i.recv_rate || 0)}</span></td>
+                <td><span class="port-num">${fmtRate(i.sent_rate || 0)}</span></td>
+                <td><span class="pid">${fmtBytes(i.bytes_recv || 0)}</span></td>
+                <td><span class="pid">${fmtBytes(i.bytes_sent || 0)}</span></td>
+            </tr>`).join("");
+        }
+
+        function renderEvents(data) {
+            const events = data.events || [];
+            const section = document.getElementById("events-section");
+            const list = document.getElementById("events-list");
+            if (events.length === 0) { section.style.display = "none"; return; }
+            section.style.display = "";
+            list.innerHTML = events.map(e => `<li class="event-item">
+                <span class="event-severity ${e.severity || 'info'}"></span>
+                <div class="event-content">
+                    <div class="event-message">${esc(e.message)}</div>
+                    <div class="event-meta">${esc(e.type || "")}</div>
+                </div>
+            </li>`).join("");
+        }
+
+        function renderAll(data) {
+            document.getElementById("stat-conns").textContent = data.connections_total || 0;
+            document.getElementById("stat-listen").textContent = data.listening_total || 0;
+            document.getElementById("stat-events").textContent = (data.events || []).length;
+            document.getElementById("last-seen").textContent = "Dernier rapport : " + (data.iso_time || "?");
+            renderBandwidth(data);
+            renderProcessSummary(data);
+            renderListening(data);
+            renderConnections(data);
+            renderEvents(data);
+        }
+
+        async function refresh() {
+            try {
+                const resp = await fetch("/api/hosts/" + encodeURIComponent(HOSTNAME));
+                if (!resp.ok) return;
+                const data = await resp.json();
+                lastData = data;
+                renderAll(data);
+                document.getElementById("live-dot").style.background = "var(--success)";
+                document.getElementById("live-label").textContent = "Live";
+            } catch(e) {
+                document.getElementById("live-dot").style.background = "var(--danger)";
+                document.getElementById("live-label").textContent = "Offline";
+            }
+        }
+
+        // Initial render from server-side data, then switch to AJAX
+        renderAll({{ host | tojson }});
+        setInterval(refresh, 5000);
+
         // Clock
         function updateClock() {
-            const now = new Date();
-            document.getElementById('clock').textContent =
-                now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            document.getElementById("clock").textContent =
+                new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
         }
         updateClock();
         setInterval(updateClock, 1000);
 
-        // Filters
+        // Client-side filter
         function setupFilter(inputId, tableId) {
             const input = document.getElementById(inputId);
             if (!input) return;
-            input.addEventListener('input', function() {
+            input.addEventListener("input", function() {
                 const q = this.value.toLowerCase();
-                document.querySelectorAll('#' + tableId + ' tbody tr').forEach(row => {
-                    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+                document.querySelectorAll("#" + tableId + " tbody tr").forEach(row => {
+                    row.style.display = row.textContent.toLowerCase().includes(q) ? "" : "none";
                 });
             });
         }
-        setupFilter('listen-filter', 'listen-table');
-        setupFilter('conn-filter', 'conn-table');
-
-        // Auto-refresh
-        setTimeout(() => location.reload(), 15000);
+        setupFilter("listen-filter", "listen-table");
+        setupFilter("conn-filter", "conn-table");
     </script>
 </body>
 </html>
