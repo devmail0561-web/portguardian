@@ -311,6 +311,70 @@ def api_host_stats(hostname: str):
     return jsonify(hist)
 
 
+@app.route("/api/stats")
+@require_auth
+def api_global_stats():
+    """Statistiques agrégées de toutes les machines — séries temporelles + snapshot courant."""
+    with _lock:
+        hosts_snap = dict(_hosts)
+        history_snap = {h: list(v) for h, v in _history.items()}
+
+    now = time.time()
+
+    # Snapshot courant par machine
+    machines = []
+    total_conns = 0
+    total_listen = 0
+    for hostname, snap in hosts_snap.items():
+        age = now - snap.get("timestamp", 0)
+        status = "online" if age < 120 else "stale" if age < 600 else "offline"
+        c = snap.get("connections_total", 0)
+        l = snap.get("listening_total", 0)
+        total_conns += c
+        total_listen += l
+        sys_info = snap.get("system", {})
+        bw = snap.get("bandwidth", [])
+        total_recv = sum(i.get("recv_rate", 0) for i in bw)
+        total_sent = sum(i.get("sent_rate", 0) for i in bw)
+        machines.append({
+            "hostname": hostname,
+            "status": status,
+            "connections": c,
+            "listening": l,
+            "cpu_percent": sys_info.get("cpu_percent", 0),
+            "memory_percent": sys_info.get("memory_percent", 0),
+            "recv_rate": total_recv,
+            "sent_rate": total_sent,
+            "events_count": len(snap.get("events", [])),
+        })
+
+    # Série temporelle agrégée : somme connexions + ports sur les N derniers points
+    # On aligne sur un axe temps commun (bucket de 30s)
+    bucket_size = 30
+    buckets: dict[int, dict] = {}
+    for hostname, hist in history_snap.items():
+        for pt in hist:
+            ts = pt.get("timestamp", 0)
+            b = int(ts / bucket_size) * bucket_size
+            if b not in buckets:
+                buckets[b] = {"timestamp": b, "connections_total": 0, "listening_total": 0}
+            buckets[b]["connections_total"] += pt.get("connections_total", 0)
+            buckets[b]["listening_total"] += pt.get("listening_total", 0)
+
+    timeline = sorted(buckets.values(), key=lambda x: x["timestamp"])[-60:]
+
+    return jsonify({
+        "machines": machines,
+        "timeline": timeline,
+        "totals": {
+            "machines": len(machines),
+            "online": sum(1 for m in machines if m["status"] == "online"),
+            "connections": total_conns,
+            "listening": total_listen,
+        },
+    })
+
+
 @app.route("/api/audit")
 @require_auth
 def api_audit():

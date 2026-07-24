@@ -4,149 +4,173 @@
 {% block head %}
 <style>
 .dash-layout {
-    display: grid;
-    grid-template-rows: auto auto 1fr auto;
+    display: flex; flex-direction: column;
     height: calc(100vh - 60px);
-    padding: 14px 20px 0;
-    gap: 10px;
-    overflow: hidden;
+    padding: 14px 20px 14px;
+    gap: 10px; overflow: hidden;
 }
 
-/* ── stat cards ── */
+/* stat cards */
 .dash-stats {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-    flex-shrink: 0;
+    gap: 8px; flex-shrink: 0;
 }
 .dash-stats .stat-card { padding: 10px 14px; }
 .dash-stats .stat-card-value { font-size: 22px; }
-.stat-sub-row { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.stat-sub-row { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
 .stat-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
-/* ── main area ── */
-.dash-main {
+/* charts row */
+.dash-charts {
     display: grid;
-    grid-template-columns: 1fr 320px;
-    gap: 10px;
-    min-height: 0;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px; flex-shrink: 0;
 }
-
-/* machines table */
-.dash-left {
-    display: flex; flex-direction: column;
-    min-height: 0;
-}
-.dash-left .table-container {
-    flex: 1; min-height: 0; overflow: hidden;
-    display: flex; flex-direction: column; margin-bottom: 0;
-}
-.dash-left .table-header { flex-shrink: 0; }
-.dash-left .table-scroll { overflow-y: auto; flex: 1; }
-
-/* right panel: charts + notifications */
-.dash-right {
-    display: flex; flex-direction: column;
-    gap: 10px; min-height: 0;
-}
-
-/* chart card */
 .chart-card {
     background: var(--bg-card); border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg); padding: 14px 16px; flex-shrink: 0;
+    border-radius: var(--radius-lg); padding: 12px 14px;
+}
+.chart-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
 }
 .chart-title {
     font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .05em; color: var(--text-muted); margin-bottom: 10px;
+    letter-spacing: .05em; color: var(--text-muted);
 }
-.bar-chart { display: flex; flex-direction: column; gap: 6px; }
-.bar-row { display: grid; grid-template-columns: 90px 1fr 36px; align-items: center; gap: 8px; }
+.chart-current {
+    font-size: 13px; font-weight: 700; font-family: var(--font-mono);
+    color: var(--text-primary);
+}
+svg.linechart { display: block; width: 100%; height: 52px; overflow: visible; }
+.lc-area { opacity: .15; }
+.lc-line { fill: none; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.lc-dot { r: 3; }
+
+/* main row */
+.dash-main {
+    flex: 1; min-height: 0;
+    display: grid; grid-template-columns: 1fr 280px; gap: 8px;
+}
+
+/* table */
+.dash-table-wrap {
+    display: flex; flex-direction: column; min-height: 0;
+}
+.dash-table-wrap .table-container {
+    flex: 1; min-height: 0; overflow: hidden;
+    display: flex; flex-direction: column; margin-bottom: 0;
+}
+.dash-table-wrap .table-header { flex-shrink: 0; }
+.table-scroll { overflow-y: auto; flex: 1; }
+
+/* bar chart per-machine */
+.bar-chart { display: flex; flex-direction: column; gap: 5px; }
+.bar-row { display: grid; grid-template-columns: 80px 1fr 34px; align-items: center; gap: 6px; }
 .bar-label {
     font-size: 11px; font-family: var(--font-mono); color: var(--text-secondary);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right;
 }
-.bar-track { height: 6px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden; }
-.bar-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
+.bar-track { height: 5px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; transition: width .4s; }
 .bar-val { font-size: 10px; font-family: var(--font-mono); color: var(--text-muted); text-align: right; }
 
-/* notifications panel */
+/* right panel */
+.dash-right {
+    display: flex; flex-direction: column; gap: 8px; min-height: 0;
+}
+.dash-right .chart-card { flex-shrink: 0; }
+
+/* notifications */
 .notif-panel {
     background: var(--bg-card); border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg); flex: 1; min-height: 0;
     display: flex; flex-direction: column; overflow: hidden;
 }
 .notif-header {
-    padding: 10px 14px; border-bottom: 1px solid var(--border-subtle);
+    padding: 8px 12px; border-bottom: 1px solid var(--border-subtle);
     display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
 }
-.notif-title { font-size: 13px; font-weight: 600; }
+.notif-title { font-size: 12px; font-weight: 600; }
 .notif-badge {
-    font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px;
-    background: var(--danger-subtle); color: var(--danger); min-width: 20px; text-align: center;
+    font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px;
+    background: var(--danger-subtle); color: var(--danger);
 }
 .notif-badge.empty { background: var(--bg-tertiary); color: var(--text-muted); }
-.notif-list { overflow-y: auto; flex: 1; padding: 6px 0; }
+.notif-list { overflow-y: auto; flex: 1; }
 .notif-item {
-    display: flex; align-items: flex-start; gap: 10px;
-    padding: 8px 14px; transition: background var(--transition); cursor: default;
-    border-left: 3px solid transparent;
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 7px 12px; border-left: 3px solid transparent;
+    transition: background var(--transition);
 }
 .notif-item:hover { background: rgba(59,130,246,.04); }
 .notif-item.sev-critical { border-left-color: var(--danger); }
 .notif-item.sev-warning  { border-left-color: var(--warning); }
 .notif-item.sev-info     { border-left-color: var(--accent); }
 .notif-dot {
-    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 5px;
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 5px;
 }
-.sev-critical .notif-dot { background: var(--danger); box-shadow: 0 0 5px var(--danger); }
+.sev-critical .notif-dot { background: var(--danger); box-shadow: 0 0 4px var(--danger); }
 .sev-warning  .notif-dot { background: var(--warning); }
 .sev-info     .notif-dot { background: var(--accent); }
 .notif-body { flex: 1; min-width: 0; }
-.notif-msg { font-size: 12px; color: var(--text-primary); line-height: 1.4; }
-.notif-meta { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.notif-msg { font-size: 11px; color: var(--text-primary); line-height: 1.4; }
+.notif-meta { display: flex; gap: 5px; margin-top: 2px; flex-wrap: wrap; }
 .notif-host {
-    font-size: 10px; font-family: var(--font-mono); padding: 1px 5px;
+    font-size: 10px; font-family: var(--font-mono); padding: 1px 4px;
     background: var(--bg-tertiary); border-radius: 3px; color: var(--text-secondary);
 }
 .notif-time { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); }
 .notif-empty {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    height: 100%; gap: 8px; color: var(--text-muted); font-size: 12px;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 100%; gap: 6px;
+    color: var(--text-muted); font-size: 11px;
 }
-.notif-empty svg { opacity: .3; }
+.notif-empty svg { opacity: .25; }
 
-/* deploy tip */
+/* deploy tip — une ligne dans le coin */
 .deploy-tip {
+    position: fixed; bottom: 16px; right: 24px; z-index: 50;
+}
+.deploy-tip-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px; font-size: 11px; font-weight: 500;
     background: var(--bg-secondary); border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg); flex-shrink: 0; overflow: hidden;
-    margin-bottom: 14px;
+    border-radius: 20px; color: var(--text-muted); cursor: pointer;
+    transition: all var(--transition);
 }
-.deploy-tip-toggle {
-    display: flex; align-items: center; gap: 8px;
-    padding: 8px 14px; cursor: pointer; user-select: none;
-    font-size: 12px; color: var(--text-muted);
-    transition: color var(--transition);
+.deploy-tip-btn:hover { border-color: var(--accent); color: var(--accent); }
+.deploy-tip-btn svg { width: 13px; height: 13px; opacity: .7; }
+.deploy-tip-popup {
+    display: none; position: absolute; bottom: calc(100% + 8px); right: 0;
+    width: 520px; background: var(--bg-card); border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg); padding: 14px 16px;
+    box-shadow: var(--shadow-lg);
 }
-.deploy-tip-toggle:hover { color: var(--text-secondary); }
-.deploy-tip-toggle svg { width: 14px; height: 14px; opacity: .6; }
-.deploy-tip-arrow { margin-left: auto; transition: transform .2s; }
-.deploy-tip.open .deploy-tip-arrow { transform: rotate(180deg); }
-.deploy-tip-body { display: none; padding: 0 14px 12px; }
-.deploy-tip.open .deploy-tip-body { display: block; }
-.deploy-cmds { display: flex; flex-direction: column; gap: 6px; }
-.deploy-cmd-row { display: flex; align-items: center; gap: 8px; }
+.deploy-tip.open .deploy-tip-popup { display: block; }
+.deploy-tip-close {
+    float: right; background: none; border: none;
+    color: var(--text-muted); cursor: pointer; font-size: 14px; padding: 0 4px;
+}
+.deploy-tip-label {
+    font-size: 11px; font-weight: 600; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px;
+}
+.deploy-cmd-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.deploy-cmd-row:last-child { margin-bottom: 0; }
 .deploy-cmd-row code {
     flex: 1; font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary);
     background: var(--bg-tertiary); padding: 5px 10px; border-radius: var(--radius-sm);
-    border: 1px solid var(--border-subtle); overflow-x: auto; white-space: nowrap;
+    border: 1px solid var(--border-subtle); white-space: nowrap; overflow-x: auto;
 }
-.deploy-copy {
-    font-size: 10px; font-weight: 600; padding: 4px 8px;
-    background: var(--bg-card); border: 1px solid var(--border-subtle);
+.deploy-copy-btn {
+    font-size: 10px; font-weight: 600; padding: 4px 8px; white-space: nowrap;
+    background: var(--bg-secondary); border: 1px solid var(--border-subtle);
     border-radius: var(--radius-sm); color: var(--text-muted); cursor: pointer;
-    white-space: nowrap; transition: all var(--transition);
+    transition: all var(--transition);
 }
-.deploy-copy:hover { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent); }
+.deploy-copy-btn:hover { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent); }
 </style>
 {% endblock %}
 
@@ -175,9 +199,7 @@
         <div class="stat-card">
             <div class="stat-card-header">
                 <span class="stat-card-label">Machines</span>
-                <div class="stat-card-icon blue">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                </div>
+                <div class="stat-card-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
             </div>
             <div class="stat-card-value" id="s-hosts">{{ hosts|length }}</div>
             <div class="stat-sub-row">
@@ -188,19 +210,15 @@
         <div class="stat-card">
             <div class="stat-card-header">
                 <span class="stat-card-label">Connexions</span>
-                <div class="stat-card-icon green">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                </div>
+                <div class="stat-card-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
             </div>
             <div class="stat-card-value" id="s-conns">{{ hosts|sum(attribute='connections') }}</div>
-            <div class="stat-card-sub">actives total</div>
+            <div class="stat-card-sub">total actives</div>
         </div>
         <div class="stat-card">
             <div class="stat-card-header">
                 <span class="stat-card-label">Ports LISTEN</span>
-                <div class="stat-card-icon yellow">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                </div>
+                <div class="stat-card-icon yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
             </div>
             <div class="stat-card-value" id="s-listen">{{ hosts|sum(attribute='listening') }}</div>
             <div class="stat-card-sub">total</div>
@@ -208,39 +226,55 @@
         <div class="stat-card">
             <div class="stat-card-header">
                 <span class="stat-card-label">Alertes</span>
-                <div class="stat-card-icon red">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                </div>
+                <div class="stat-card-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg></div>
             </div>
             <div class="stat-card-value" id="s-events">{{ events|list|length }}</div>
             <div class="stat-card-sub">evenements recents</div>
         </div>
     </div>
 
-    <!-- ── Main area ── -->
+    <!-- ── Graphiques d'activite agregee ── -->
+    <div class="dash-charts">
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-title">Connexions totales — activite</span>
+                <span class="chart-current" id="cc-current">—</span>
+            </div>
+            <svg class="linechart" id="lc-conns" viewBox="0 0 400 52" preserveAspectRatio="none">
+                <text x="200" y="30" text-anchor="middle" fill="var(--text-muted)" font-size="11">En attente de donnees...</text>
+            </svg>
+        </div>
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-title">Ports en ecoute — activite</span>
+                <span class="chart-current" id="lc-current">—</span>
+            </div>
+            <svg class="linechart" id="lc-ports" viewBox="0 0 400 52" preserveAspectRatio="none">
+                <text x="200" y="30" text-anchor="middle" fill="var(--text-muted)" font-size="11">En attente de donnees...</text>
+            </svg>
+        </div>
+    </div>
+
+    <!-- ── Main ── -->
     <div class="dash-main">
 
-        <!-- Machines table -->
-        <div class="dash-left">
+        <!-- Table machines -->
+        <div class="dash-table-wrap">
             <div class="table-container">
                 <div class="table-header">
                     <div>
-                        <span class="table-title">Machines surveillees</span>
-                        <span class="table-count" id="hosts-count">{{ hosts|length }} hote{{ 's' if hosts|length > 1 }}</span>
+                        <span class="table-title">Machines</span>
+                        <span class="table-count" id="hosts-count">{{ hosts|length }}</span>
                     </div>
-                    <input type="text" class="table-filter" placeholder="Filtrer..." id="host-filter" style="width:130px">
+                    <input type="text" class="table-filter" placeholder="Filtrer..." id="host-filter" style="width:120px">
                 </div>
                 {% if hosts %}
                 <div class="table-scroll">
                     <table id="hosts-table">
                         <thead>
                             <tr>
-                                <th>Statut</th>
-                                <th>Hostname</th>
-                                <th>Connexions</th>
-                                <th>Ports</th>
-                                <th>Alertes</th>
-                                <th>Derniere activite</th>
+                                <th>Statut</th><th>Hostname</th><th>Conn.</th>
+                                <th>Ports</th><th>CPU</th><th>Mem</th><th>Alertes</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -250,8 +284,9 @@
                                 <td><a href="/host/{{ host.hostname }}" class="host-link">{{ host.hostname }}</a></td>
                                 <td><span class="port-num">{{ host.connections }}</span></td>
                                 <td><span class="port-num">{{ host.listening }}</span></td>
+                                <td><span class="pid">—</span></td>
+                                <td><span class="pid">—</span></td>
                                 <td>{% if host.events > 0 %}<span class="badge badge-stale">{{ host.events }}</span>{% else %}<span class="pid">—</span>{% endif %}</td>
-                                <td><span class="event-time">{{ host.last_seen }}</span></td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -261,69 +296,56 @@
                 <div class="empty-state">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                     <h3>Aucun agent connecte</h3>
-                    <p>Deployez l'agent PortGuardian sur vos machines pour commencer la surveillance.</p>
+                    <p>Deployez l'agent PortGuardian sur vos machines pour commencer.</p>
                 </div>
                 {% endif %}
             </div>
         </div>
 
-        <!-- Right panel -->
+        <!-- Right: barres par machine + notifs -->
         <div class="dash-right">
 
-            <!-- Chart: connexions par machine -->
             <div class="chart-card">
-                <div class="chart-title">Connexions par machine</div>
+                <div class="chart-title" style="margin-bottom:8px">Connexions par machine</div>
                 <div class="bar-chart" id="chart-conns">
-                    <span class="pid" style="font-size:11px">Chargement...</span>
+                    <span class="pid" style="font-size:11px">—</span>
                 </div>
             </div>
 
-            <!-- Chart: ports LISTEN par machine -->
-            <div class="chart-card">
-                <div class="chart-title">Ports en ecoute par machine</div>
-                <div class="bar-chart" id="chart-ports">
-                    <span class="pid" style="font-size:11px">Chargement...</span>
-                </div>
-            </div>
-
-            <!-- Notifications -->
             <div class="notif-panel">
                 <div class="notif-header">
-                    <span class="notif-title">Alertes</span>
+                    <span class="notif-title">Alertes recentes</span>
                     <span class="notif-badge empty" id="notif-count">0</span>
                 </div>
                 <div class="notif-list" id="notif-list">
                     <div class="notif-empty">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:32px;height:32px"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
                         <span>Aucune alerte</span>
                     </div>
                 </div>
             </div>
-
         </div>
     </div>
+</div>
 
-    <!-- ── Deploy tip ── -->
-    <div class="deploy-tip" id="deploy-tip">
-        <div class="deploy-tip-toggle" onclick="toggleDeploy()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-            <span>Comment deployer un agent sur une nouvelle machine ?</span>
-            <svg class="deploy-tip-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+<!-- ── Deploy tip — bouton fixe en bas a droite ── -->
+<div class="deploy-tip" id="deploy-tip">
+    <button class="deploy-tip-btn" onclick="toggleDeploy()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        Deployer un agent
+    </button>
+    <div class="deploy-tip-popup">
+        <button class="deploy-tip-close" onclick="toggleDeploy()">✕</button>
+        <div class="deploy-tip-label">Ajouter une machine</div>
+        <div class="deploy-cmd-row">
+            <code id="dcmd-1">git clone &lt;url&gt; &amp;&amp; cd port_listen_script &amp;&amp; python3 -m venv venv &amp;&amp; venv/bin/pip install -r portguardian/requirements.txt</code>
+            <button class="deploy-copy-btn" onclick="copyCmd('dcmd-1')">Copier</button>
         </div>
-        <div class="deploy-tip-body">
-            <div class="deploy-cmds">
-                <div class="deploy-cmd-row">
-                    <code id="dcmd-1">git clone &lt;url&gt; &amp;&amp; cd port_listen_script &amp;&amp; python3 -m venv venv &amp;&amp; venv/bin/pip install -r portguardian/requirements.txt</code>
-                    <button class="deploy-copy" onclick="copyCmd('dcmd-1')">Copier</button>
-                </div>
-                <div class="deploy-cmd-row">
-                    <code id="dcmd-2">./portguardian agent run --server http://{{ request.host }}{% if api_key_set %} --api-key &lt;VOTRE_API_KEY&gt;{% endif %}</code>
-                    <button class="deploy-copy" onclick="copyCmd('dcmd-2')">Copier</button>
-                </div>
-            </div>
+        <div class="deploy-cmd-row">
+            <code id="dcmd-2">./portguardian agent run --server http://{{ request.host }}{% if api_key_set %} --api-key &lt;VOTRE_API_KEY&gt;{% endif %}</code>
+            <button class="deploy-copy-btn" onclick="copyCmd('dcmd-2')">Copier</button>
         </div>
     </div>
-
 </div>
 {% endblock %}
 
@@ -335,29 +357,65 @@ function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 function toggleDeploy(){
     document.getElementById('deploy-tip').classList.toggle('open');
 }
-
+document.addEventListener('click', e=>{
+    const tip = document.getElementById('deploy-tip');
+    if(!tip.contains(e.target)) tip.classList.remove('open');
+});
 function copyCmd(id){
     navigator.clipboard.writeText(document.getElementById(id).textContent).then(()=>{
-        const btn = document.getElementById(id).parentElement.querySelector('.deploy-copy');
-        btn.textContent='Copie !';
-        setTimeout(()=>{ btn.textContent='Copier'; }, 2000);
+        const btn = document.getElementById(id).parentElement.querySelector('.deploy-copy-btn');
+        btn.textContent='OK'; setTimeout(()=>{ btn.textContent='Copier'; }, 1500);
     });
 }
 
 /* filter */
 document.getElementById('host-filter').addEventListener('input', function(){
     const q = this.value.toLowerCase();
-    document.querySelectorAll('#hosts-table tbody tr').forEach(row=>{
-        row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    document.querySelectorAll('#hosts-table tbody tr').forEach(r=>{
+        r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
     });
 });
 
-/* ── bar charts ── */
+/* ── line chart SVG ── */
+function drawLineChart(svgId, values, color, currentId){
+    const svg = document.getElementById(svgId);
+    if(!svg) return;
+    const W=400, H=52, pad=2;
+    if(!values || values.length < 2){
+        svg.innerHTML=`<text x="200" y="30" text-anchor="middle" fill="var(--text-muted)" font-size="11">En attente de donnees...</text>`;
+        if(currentId) document.getElementById(currentId).textContent='—';
+        return;
+    }
+    const mn = Math.min(...values);
+    const mx = Math.max(...values, mn+1);
+    const range = mx - mn;
+    const pts = values.map((v,i)=>{
+        const x = pad + (i/(values.length-1))*(W-2*pad);
+        const y = H-pad - ((v-mn)/range)*(H-2*pad);
+        return [x.toFixed(1), y.toFixed(1)];
+    });
+    const polyPts = pts.map(p=>p.join(',')).join(' ');
+    const areaPts = `${pts[0][0]},${H} ` + polyPts + ` ${pts[pts.length-1][0]},${H}`;
+    svg.innerHTML = `
+        <defs>
+            <linearGradient id="grad-${svgId}" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="${color}" stop-opacity=".3"/>
+                <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+            </linearGradient>
+        </defs>
+        <polygon points="${areaPts}" fill="url(#grad-${svgId})"/>
+        <polyline points="${polyPts}" class="lc-line" stroke="${color}"/>
+        <circle cx="${pts[pts.length-1][0]}" cy="${pts[pts.length-1][1]}" r="3" fill="${color}"/>`;
+    if(currentId) document.getElementById(currentId).textContent = values[values.length-1];
+}
+
+/* ── bar chart ── */
 function drawBarChart(containerId, items, color){
     const el = document.getElementById(containerId);
-    if(!items.length){ el.innerHTML='<span class="pid" style="font-size:11px">Aucun agent connecte</span>'; return; }
+    if(!el) return;
+    if(!items.length){ el.innerHTML='<span class="pid" style="font-size:11px">—</span>'; return; }
     const max = Math.max(...items.map(i=>i.val), 1);
-    el.innerHTML = items.map(i=>{
+    el.innerHTML = items.slice(0,7).map(i=>{
         const pct = Math.round((i.val/max)*100);
         return `<div class="bar-row">
             <span class="bar-label" title="${esc(i.label)}">${esc(i.label)}</span>
@@ -368,99 +426,91 @@ function drawBarChart(containerId, items, color){
 }
 
 /* ── notifications ── */
-const SEV_ORDER = {critical:0, warning:1, info:2};
+const SEV = {critical:0, warning:1, info:2};
 function renderNotifs(events){
-    const el = document.getElementById('notif-list');
     const badge = document.getElementById('notif-count');
     badge.textContent = events.length;
-    badge.className = 'notif-badge' + (events.length === 0 ? ' empty' : '');
-
+    badge.className = 'notif-badge' + (!events.length ? ' empty' : '');
+    const el = document.getElementById('notif-list');
     if(!events.length){
         el.innerHTML=`<div class="notif-empty">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:32px;height:32px"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
             <span>Aucune alerte</span></div>`;
         return;
     }
-    // trier par severite puis par timestamp desc
     const sorted = [...events].sort((a,b)=>{
-        const sd=(SEV_ORDER[a.severity]??3)-(SEV_ORDER[b.severity]??3);
-        return sd !== 0 ? sd : (b.timestamp||0)-(a.timestamp||0);
+        const sd=(SEV[a.severity]??3)-(SEV[b.severity]??3);
+        return sd||((b.timestamp||0)-(a.timestamp||0));
     });
-    el.innerHTML = sorted.slice(0,30).map(e=>{
-        const sev = ['critical','warning','info'].includes(e.severity) ? e.severity : 'info';
-        const host = e.hostname ? `<span class="notif-host">${esc(e.hostname)}</span>` : '';
-        const t = e.iso_time ? `<span class="notif-time">${esc(String(e.iso_time).substring(11,19))}</span>` : '';
+    el.innerHTML = sorted.slice(0,40).map(e=>{
+        const sev = SEV[e.severity]!==undefined ? e.severity : 'info';
+        const hn = e.hostname ? `<span class="notif-host">${esc(e.hostname)}</span>` : '';
+        const t  = e.iso_time ? `<span class="notif-time">${esc(String(e.iso_time).slice(11,19))}</span>` : '';
         return `<div class="notif-item sev-${sev}">
             <span class="notif-dot"></span>
             <div class="notif-body">
                 <div class="notif-msg">${esc(e.message||e.description||'-')}</div>
-                <div class="notif-meta">${host}${t}</div>
+                <div class="notif-meta">${hn}${t}</div>
             </div>
         </div>`;
     }).join('');
 }
 
 /* ── main refresh ── */
-let _lastHosts = [];
-
 async function refreshDashboard(){
     try{
-        const [rh, re] = await Promise.all([
-            fetch('/api/hosts'),
+        const [rs, re] = await Promise.all([
+            fetch('/api/stats'),
             fetch('/api/events?limit=50'),
         ]);
-        const cth = rh.headers.get('content-type')||'';
-        if(!cth.includes('application/json')){ window.location.href='/login'; return; }
-        const hosts = await rh.json();
+        const ct = rs.headers.get('content-type')||'';
+        if(!ct.includes('application/json')){ window.location.href='/login'; return; }
+        const stats = await rs.json();
         const events = re.ok ? await re.json() : [];
 
-        // stat cards
-        const now = Date.now()/1000;
-        const online = hosts.filter(h=>(now-(h.timestamp||0))<120).length;
-        document.getElementById('s-hosts').textContent = hosts.length;
-        document.getElementById('s-online').textContent = online + ' en ligne';
-        document.getElementById('s-conns').textContent = hosts.reduce((s,h)=>s+(h.connections_total|0),0);
-        document.getElementById('s-listen').textContent = hosts.reduce((s,h)=>s+(h.listening_total|0),0);
+        const t = stats.totals || {};
+        document.getElementById('s-hosts').textContent  = t.machines ?? '—';
+        document.getElementById('s-online').textContent = (t.online ?? '—') + ' en ligne';
+        document.getElementById('s-conns').textContent  = t.connections ?? '—';
+        document.getElementById('s-listen').textContent = t.listening ?? '—';
         document.getElementById('s-events').textContent = events.length;
-        document.getElementById('hosts-count').textContent = hosts.length + ' hote' + (hosts.length>1?'s':'');
+        document.getElementById('hosts-count').textContent = (t.machines??0) + ' machine' + ((t.machines??0)>1?'s':'');
+
+        // courbes d'activite agregee
+        const tl = stats.timeline || [];
+        drawLineChart('lc-conns', tl.map(p=>p.connections_total), 'var(--accent)', 'cc-current');
+        drawLineChart('lc-ports', tl.map(p=>p.listening_total),   'var(--success)', 'lc-current');
 
         // table
+        const machines = stats.machines || [];
         const tbody = document.querySelector('#hosts-table tbody');
         if(tbody){
             const q = document.getElementById('host-filter').value.toLowerCase();
-            tbody.innerHTML = hosts.map(h=>{
-                const age = now-(h.timestamp||0);
-                const status = age<120?'online':age<600?'stale':'offline';
-                const hn = esc(h.hostname);
-                const ev = h.events_count|0;
-                const row = `<tr>
-                    <td><span class="badge badge-${status}"><span class="badge-dot"></span>${status}</span></td>
+            tbody.innerHTML = machines.map(m=>{
+                const hn  = esc(m.hostname);
+                const ev  = m.events_count||0;
+                const cpu = m.cpu_percent  ? `<span class="pid">${m.cpu_percent.toFixed(1)}%</span>` : '<span class="pid">—</span>';
+                const mem = m.memory_percent ? `<span class="pid">${m.memory_percent.toFixed(1)}%</span>` : '<span class="pid">—</span>';
+                return `<tr>
+                    <td><span class="badge badge-${m.status}"><span class="badge-dot"></span>${m.status}</span></td>
                     <td><a href="/host/${hn}" class="host-link">${hn}</a></td>
-                    <td><span class="port-num">${h.connections_total|0}</span></td>
-                    <td><span class="port-num">${h.listening_total|0}</span></td>
-                    <td>${ev>0?`<span class="badge badge-stale">${ev}</span>`:'<span class="pid">—</span>'}</td>
-                    <td><span class="event-time">${esc(h.last_seen)}</span></td>
+                    <td><span class="port-num">${m.connections}</span></td>
+                    <td><span class="port-num">${m.listening}</span></td>
+                    <td>${cpu}</td><td>${mem}</td>
+                    <td>${ev?`<span class="badge badge-stale">${ev}</span>`:'<span class="pid">—</span>'}</td>
                 </tr>`;
-                return row;
             }).join('');
             if(q) document.querySelectorAll('#hosts-table tbody tr').forEach(r=>{
-                r.style.display=r.textContent.toLowerCase().includes(q)?'':'none';
+                r.style.display = r.textContent.toLowerCase().includes(q)?'':'none';
             });
         }
 
-        // charts
+        // barres par machine
         drawBarChart('chart-conns',
-            hosts.map(h=>({label:h.hostname,val:h.connections_total|0}))
-                 .sort((a,b)=>b.val-a.val).slice(0,8),
+            machines.map(m=>({label:m.hostname, val:m.connections})).sort((a,b)=>b.val-a.val),
             'var(--accent)'
         );
-        drawBarChart('chart-ports',
-            hosts.map(h=>({label:h.hostname,val:h.listening_total|0}))
-                 .sort((a,b)=>b.val-a.val).slice(0,8),
-            'var(--success)'
-        );
 
-        // notifications
         renderNotifs(events);
 
     }catch(e){}
