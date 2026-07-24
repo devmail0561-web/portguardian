@@ -9,42 +9,115 @@
     padding: 14px 20px 14px; gap: 10px; overflow: hidden;
 }
 .audit-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-.audit-info {
-    background: var(--bg-card); border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg); padding: 10px 16px;
-    font-size: 12px; color: var(--text-muted);
-    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+.audit-toolbar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0;
 }
-.audit-info svg { width: 14px; height: 14px; opacity: .6; flex-shrink: 0; }
 .audit-table-wrap {
-    flex: 1; min-height: 0;
-    background: var(--bg-card); border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg); display: flex; flex-direction: column; overflow: hidden;
+    flex: 1; min-height: 0; background: var(--bg-card);
+    border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+    display: flex; flex-direction: column; overflow: hidden;
 }
 .audit-table-header {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0;
+    padding: 10px 16px; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0;
+    gap: 8px; flex-wrap: wrap;
 }
 .audit-scroll { overflow-y: auto; flex: 1; }
 .audit-empty {
     display: flex; flex-direction: column; align-items: center;
-    justify-content: center; height: 100%; gap: 10px;
+    justify-content: center; height: 100%; gap: 8px;
     color: var(--text-muted); text-align: center; padding: 40px;
 }
-.audit-empty svg { opacity: .3; margin-bottom: 4px; }
-.audit-empty h3 { font-size: 14px; color: var(--text-secondary); }
-.audit-empty p { font-size: 12px; max-width: 360px; line-height: 1.6; }
+.audit-empty svg { opacity: .25; }
+.audit-empty h3 { font-size: 13px; color: var(--text-secondary); }
+.audit-empty p { font-size: 12px; max-width: 380px; line-height: 1.6; }
 .audit-empty code {
-    display: inline-block; background: var(--bg-tertiary); padding: 2px 7px;
-    border-radius: 4px; font-family: var(--font-mono); font-size: 11px;
+    display: inline-block; background: var(--bg-tertiary); padding: 1px 6px;
+    border-radius: 3px; font-family: var(--font-mono); font-size: 11px;
     color: var(--accent); border: 1px solid var(--border-subtle);
 }
+
+/* source selector */
+.source-tabs { display: flex; gap: 2px; }
+.source-tab {
+    padding: 4px 10px; font-size: 11px; font-weight: 600; font-family: var(--font-sans);
+    color: var(--text-muted); background: var(--bg-tertiary);
+    border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+    cursor: pointer; transition: all var(--transition);
+}
+.source-tab:hover { color: var(--text-primary); }
+.source-tab.active { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent); }
+
+/* archives list */
+.archives-panel {
+    display: none; background: var(--bg-secondary); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg); padding: 12px 14px; flex-shrink: 0;
+}
+.archives-panel.visible { display: block; }
+.archives-title { font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--text-muted); margin-bottom: 8px; }
+.archives-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.archive-item {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 10px; background: var(--bg-card); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm); font-size: 11px; font-family: var(--font-mono);
+    color: var(--text-secondary); cursor: pointer; transition: all var(--transition);
+}
+.archive-item:hover { border-color: var(--accent); color: var(--accent); }
+.archive-item.active { background: var(--accent-subtle); border-color: var(--accent); color: var(--accent); }
+.archive-size { color: var(--text-muted); font-size: 10px; }
+
+/* report modal */
+.report-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,.65);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 10000; opacity: 0; pointer-events: none; transition: opacity 200ms;
+}
+.report-modal.open { opacity: 1; pointer-events: auto; }
+.report-box {
+    background: var(--bg-card); border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg); width: min(680px, 95vw); max-height: 85vh;
+    display: flex; flex-direction: column; box-shadow: var(--shadow-lg);
+}
+.report-header {
+    padding: 14px 18px; border-bottom: 1px solid var(--border-subtle);
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+}
+.report-body { padding: 18px; overflow-y: auto; flex: 1; }
+.report-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 3px; }
+.report-close:hover { background: var(--bg-tertiary); }
+
+.report-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+.report-stat {
+    background: var(--bg-secondary); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md); padding: 12px 14px; text-align: center;
+}
+.report-stat-value { font-size: 22px; font-weight: 700; font-family: var(--font-mono); }
+.report-stat-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.report-section { margin-bottom: 16px; }
+.report-section-title {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--text-muted); margin-bottom: 8px;
+    padding-bottom: 6px; border-bottom: 1px solid var(--border-subtle);
+}
+.report-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 0; border-bottom: 1px solid var(--border-subtle); font-size: 12px;
+}
+.report-row:last-child { border-bottom: none; }
+.report-row-label { font-family: var(--font-mono); color: var(--text-secondary); }
+.report-row-vals { display: flex; gap: 12px; }
+.report-ok { color: var(--success); font-weight: 600; }
+.report-fail { color: var(--danger); font-weight: 600; }
+.report-total { color: var(--text-muted); }
+.report-period { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="audit-layout">
 
+    <!-- Header -->
     <div class="audit-header">
         <div>
             <div class="breadcrumb" style="margin-bottom:2px">
@@ -53,32 +126,47 @@
             </div>
             <h2 class="page-title" style="line-height:1.1">Journal d'audit</h2>
         </div>
-        <div style="display:flex;align-items:center;gap:10px">
-            <span class="pid" id="audit-subtitle">{{ entries|length }} action{{ 's' if entries|length > 1 }}</span>
-            <input type="text" class="table-filter" placeholder="Filtrer..." id="audit-filter" style="width:140px">
+    </div>
+
+    <!-- Toolbar -->
+    <div class="audit-toolbar">
+        <div class="source-tabs">
+            <button class="source-tab active" onclick="setSource('active',this)">Recents</button>
+            <button class="source-tab" onclick="setSource('all',this)">Tout</button>
+            <button class="source-tab" id="tab-archives" onclick="toggleArchives()">Archives <span id="arch-count" class="table-count"></span></button>
+        </div>
+        <input type="text" class="table-filter" placeholder="Filtrer..." id="audit-filter" style="width:140px">
+        <div style="display:flex;gap:6px;margin-left:auto">
+            <button class="btn-action" onclick="downloadActive()">Telecharger (.jsonl)</button>
+            <button class="btn-action" onclick="downloadCsv()">Exporter CSV</button>
+            <button class="btn btn-primary" style="font-size:12px;padding:5px 12px" onclick="openReport()">Rapport</button>
         </div>
     </div>
 
-    <div class="audit-info">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-        Ce journal enregistre toutes les actions administratives effectuees depuis le dashboard :
-        <code>kill</code> processus, <code>block-port</code>, <code>block-ip</code>, gestion de services, commandes distantes vers les agents.
-        Persistant entre les redemarrages — stocke dans <code>~/.config/portguardian/logs/audit.jsonl</code>.
+    <!-- Archives -->
+    <div class="archives-panel" id="archives-panel">
+        <div class="archives-title">Archives disponibles — cliquer pour consulter</div>
+        <div class="archives-list" id="archives-list">
+            <span class="pid" style="font-size:11px">Aucune archive</span>
+        </div>
     </div>
 
+    <!-- Table -->
     <div class="audit-table-wrap">
         <div class="audit-table-header">
-            <span class="table-title">Actions enregistrees</span>
-            <span class="table-count" id="audit-count">{{ entries|length }}</span>
+            <div style="display:flex;align-items:center;gap:8px">
+                <span class="table-title" id="source-label">Entrees recentes</span>
+                <span class="table-count" id="audit-count">—</span>
+                <span class="pid" style="font-size:10px" id="audit-period"></span>
+            </div>
+            <span class="pid" style="font-size:10px">Max {{ entries|length }} / 50 affiches — rotation auto a 500</span>
         </div>
-
-        {% if entries %}
-        <div class="audit-scroll">
+        <div class="audit-scroll" id="audit-scroll">
             <table id="audit-table" style="width:100%;border-collapse:collapse">
                 <thead>
                     <tr>
                         <th>Date</th>
-                        <th>Source IP</th>
+                        <th>IP source</th>
                         <th>Action</th>
                         <th>Parametres</th>
                         <th>Resultat</th>
@@ -91,100 +179,257 @@
                         <td class="mono">{{ entry.iso_time }}</td>
                         <td class="mono">{{ entry.user }}</td>
                         <td><span class="badge-action">{{ entry.action }}</span></td>
-                        <td class="mono" style="max-width:260px;overflow:hidden;text-overflow:ellipsis" title="{{ entry.params }}">{{ entry.params }}</td>
-                        <td>{{ entry.result[:80] if entry.result else '' }}</td>
+                        <td class="mono" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ entry.params }}">{{ entry.params }}</td>
+                        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis">{{ entry.result[:60] if entry.result else '' }}</td>
                         <td>
                             {% if entry.success %}<span class="badge badge-success-sm">OK</span>
                             {% else %}<span class="badge badge-error-sm">FAIL</span>{% endif %}
                         </td>
                     </tr>
                     {% endfor %}
+                    {% if not entries %}
+                    <tr><td colspan="6" class="empty-cell" style="padding:40px;text-align:center">
+                        Aucune action enregistree — l'audit se remplit quand vous effectuez des actions depuis le dashboard
+                        (kill, block-port, block-ip, service, commandes distantes)
+                    </td></tr>
+                    {% endif %}
                 </tbody>
             </table>
         </div>
-        {% else %}
-        <div class="audit-empty" id="audit-empty">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            <h3>Aucune action enregistree</h3>
-            <p>
-                L'audit se remplit quand vous effectuez des actions depuis le dashboard :
-                terminer un processus, bloquer un port ou une IP, gerer un service, envoyer une commande a un agent distant.
-            </p>
-        </div>
-        {% endif %}
     </div>
 
+</div>
+
+<!-- Report modal -->
+<div class="report-modal" id="report-modal" onclick="if(event.target===this)closeReport()">
+    <div class="report-box">
+        <div class="report-header">
+            <span style="font-size:14px;font-weight:600">Rapport d'audit</span>
+            <button class="report-close" onclick="closeReport()">✕</button>
+        </div>
+        <div class="report-body" id="report-body">
+            <span class="pid">Chargement...</span>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-    let _auditFilter = '';
-    document.getElementById('audit-filter').addEventListener('input', function(){
-        _auditFilter = this.value.toLowerCase();
-        applyAuditFilter();
+let _auditFilter = '';
+let _currentSource = 'active';
+
+document.getElementById('audit-filter').addEventListener('input', function(){
+    _auditFilter = this.value.toLowerCase();
+    applyFilter();
+});
+function applyFilter(){
+    document.querySelectorAll('#audit-table tbody tr').forEach(row=>{
+        row.style.display = row.textContent.toLowerCase().includes(_auditFilter) ? '' : 'none';
     });
-    function applyAuditFilter(){
-        document.querySelectorAll('#audit-table tbody tr').forEach(row=>{
-            row.style.display = row.textContent.toLowerCase().includes(_auditFilter) ? '' : 'none';
-        });
+}
+
+/* ── source selector ── */
+function setSource(src, btn){
+    _currentSource = src;
+    document.querySelectorAll('.source-tab').forEach(t=>t.classList.remove('active'));
+    if(btn) btn.classList.add('active');
+    document.getElementById('archives-panel').classList.remove('visible');
+    document.querySelectorAll('.archive-item').forEach(a=>a.classList.remove('active'));
+    if(src === 'active'){
+        document.getElementById('source-label').textContent = 'Entrees recentes';
+        loadActive();
+    } else {
+        document.getElementById('source-label').textContent = 'Toutes les entrees';
+        loadAll();
     }
+}
 
-    async function refreshAudit(){
-        try{
-            const resp = await fetch('/api/audit?limit=200');
-            if(!resp.ok) return;
-            const ct = resp.headers.get('content-type')||'';
-            if(!ct.includes('application/json')){ window.location.href='/login'; return; }
-            const entries = await resp.json();
+function toggleArchives(){
+    const panel = document.getElementById('archives-panel');
+    panel.classList.toggle('visible');
+    if(panel.classList.contains('visible')) loadArchivesList();
+}
 
-            document.getElementById('audit-subtitle').textContent = entries.length + ' action' + (entries.length>1?'s':'');
-            document.getElementById('audit-count').textContent = entries.length;
+async function loadArchivesList(){
+    try{
+        const r = await fetch('/api/audit/archives');
+        if(!r.ok) return;
+        const archives = await r.json();
+        document.getElementById('arch-count').textContent = archives.length || '';
+        const list = document.getElementById('archives-list');
+        if(!archives.length){
+            list.innerHTML = '<span class="pid" style="font-size:11px">Aucune archive — rotation automatique a 500 entrees</span>';
+            return;
+        }
+        list.innerHTML = archives.map(a=>`
+            <div class="archive-item" onclick="loadArchive('${esc(a.name)}')" data-name="${esc(a.name)}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                ${esc(a.name.replace('audit.','').replace('.jsonl.gz',''))}
+                <span class="archive-size">${(a.size_bytes/1024).toFixed(1)} KB</span>
+            </div>`).join('');
+    }catch(e){}
+}
 
-            // Affiche l'empty state ou la table
-            const empty = document.getElementById('audit-empty');
-            let tbody = document.getElementById('audit-body');
+async function loadArchive(name){
+    _currentSource = name;
+    document.querySelectorAll('.source-tab').forEach(t=>t.classList.remove('active'));
+    document.getElementById('tab-archives').classList.add('active');
+    document.querySelectorAll('.archive-item').forEach(a=>{
+        a.classList.toggle('active', a.dataset.name === name);
+    });
+    document.getElementById('source-label').textContent = name.replace('audit.','').replace('.jsonl.gz','');
+    const r = await fetch('/api/audit/archives/' + encodeURIComponent(name));
+    if(!r.ok) return;
+    // L'archive est un fichier gzip — on ne peut pas le lire directement en JS
+    // On passe par une route qui le décompresse
+    // → utiliser /api/audit?source=<name> n'existe pas; on télécharge simplement
+    // Pour l'affichage on utilise /api/audit/report?source=<name>&format=json et on affiche les stats
+    renderArchiveView(name);
+}
 
-            if(!entries.length){
-                if(empty) empty.style.display='flex';
-                if(tbody) tbody.closest('table').style.display='none';
-                return;
-            }
-            if(empty) empty.style.display='none';
+async function renderArchiveView(name){
+    document.getElementById('source-label').textContent = 'Archive: ' + name.replace('audit.','').replace('.jsonl.gz','');
+    document.getElementById('audit-count').textContent = '...';
+    // On ne décompresse pas en JS — afficher un message + bouton télécharger
+    document.getElementById('audit-body').innerHTML = `<tr><td colspan="6" style="padding:30px;text-align:center">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--text-muted)">
+            <span style="font-size:12px">Archive compressée — consultez via téléchargement ou générez un rapport.</span>
+            <div style="display:flex;gap:8px">
+                <button class="btn btn-primary" style="font-size:12px;padding:5px 14px"
+                    onclick="window.location='/api/audit/archives/${esc(name)}'">Télécharger l'archive</button>
+                <button class="btn-action" onclick="openReport()">Rapport de cette archive</button>
+            </div>
+        </div>
+    </td></tr>`;
+    document.getElementById('audit-count').textContent = '(archive)';
+}
 
-            // Crée la table si elle n'existait pas (premier chargement avec entries vides)
-            if(!tbody){
-                const wrap = document.querySelector('.audit-scroll') || (() => {
-                    const d = document.createElement('div');
-                    d.className = 'audit-scroll';
-                    document.querySelector('.audit-table-wrap').appendChild(d);
-                    return d;
-                })();
-                wrap.innerHTML = `<table id="audit-table" style="width:100%;border-collapse:collapse">
-                    <thead><tr>
-                        <th>Date</th><th>Source IP</th><th>Action</th>
-                        <th>Parametres</th><th>Resultat</th><th>Statut</th>
-                    </tr></thead>
-                    <tbody id="audit-body"></tbody>
-                </table>`;
-                tbody = document.getElementById('audit-body');
-            }
+/* ── load entries ── */
+async function loadActive(){
+    try{
+        const r = await fetch('/api/audit?limit=50');
+        if(!r.ok) return;
+        const ct = r.headers.get('content-type')||'';
+        if(!ct.includes('application/json')){ window.location.href='/login'; return; }
+        renderEntries(await r.json(), 'active');
+    }catch(e){}
+}
 
-            tbody.innerHTML = entries.map(e=>`<tr>
-                <td class="mono">${esc(e.iso_time)}</td>
-                <td class="mono">${esc(e.user)}</td>
-                <td><span class="badge-action">${esc(e.action)}</span></td>
-                <td class="mono" style="max-width:260px;overflow:hidden;text-overflow:ellipsis" title="${esc(typeof e.params==='object'?JSON.stringify(e.params):e.params)}">${esc(typeof e.params==='object'?JSON.stringify(e.params):e.params)}</td>
-                <td>${esc(String(e.result||'').substring(0,80))}</td>
-                <td>${e.success?'<span class="badge badge-success-sm">OK</span>':'<span class="badge badge-error-sm">FAIL</span>'}</td>
-            </tr>`).join('');
-            applyAuditFilter();
-        }catch(e){}
+async function loadAll(){
+    // Charge depuis le rapport "all" pour avoir toutes les entrées
+    try{
+        const r = await fetch('/api/audit?limit=1000');
+        if(!r.ok) return;
+        renderEntries(await r.json(), 'all');
+    }catch(e){}
+}
+
+function renderEntries(entries, source){
+    document.getElementById('audit-count').textContent = entries.length;
+    if(!entries.length){
+        document.getElementById('audit-body').innerHTML = `<tr><td colspan="6" class="empty-cell" style="padding:40px;text-align:center">
+            Aucune action enregistree — l'audit se remplit quand vous effectuez des actions depuis le dashboard
+        </td></tr>`;
+        document.getElementById('audit-period').textContent = '';
+        return;
     }
+    // période
+    const ts = entries.map(e=>e.timestamp||0).filter(Boolean);
+    if(ts.length >= 2){
+        const from = new Date(Math.min(...ts)*1000).toLocaleDateString('fr-FR');
+        const to   = new Date(Math.max(...ts)*1000).toLocaleDateString('fr-FR');
+        document.getElementById('audit-period').textContent = from === to ? from : `${from} → ${to}`;
+    }
+    document.getElementById('audit-body').innerHTML = entries.map(e=>`<tr>
+        <td class="mono">${esc(e.iso_time||'')}</td>
+        <td class="mono">${esc(e.user||'')}</td>
+        <td><span class="badge-action">${esc(e.action||'')}</span></td>
+        <td class="mono" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+            title="${esc(typeof e.params==='object'?JSON.stringify(e.params):e.params)}"
+            >${esc(typeof e.params==='object'?JSON.stringify(e.params):String(e.params||''))}</td>
+        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis">${esc(String(e.result||'').substring(0,60))}</td>
+        <td>${e.success?'<span class="badge badge-success-sm">OK</span>':'<span class="badge badge-error-sm">FAIL</span>'}</td>
+    </tr>`).join('');
+    applyFilter();
+}
 
-    refreshAudit();
-    setInterval(refreshAudit, 5000);
+/* ── downloads ── */
+function downloadActive(){
+    window.location.href = '/api/audit/download';
+}
+function downloadCsv(){
+    window.location.href = '/api/audit/report?source=' + encodeURIComponent(_currentSource === 'active' ? 'active' : _currentSource) + '&format=csv';
+}
+
+/* ── report modal ── */
+async function openReport(){
+    document.getElementById('report-modal').classList.add('open');
+    document.getElementById('report-body').innerHTML = '<span class="pid">Chargement...</span>';
+    try{
+        const src = ['active','all'].includes(_currentSource) ? _currentSource : _currentSource;
+        const r = await fetch('/api/audit/report?source=' + encodeURIComponent(src));
+        if(!r.ok){ document.getElementById('report-body').innerHTML='<span style="color:var(--danger)">Erreur</span>'; return; }
+        const d = await r.json();
+        const pct = d.total ? Math.round(d.success/d.total*100) : 0;
+        const period = d.period.from
+            ? `${d.period.from.slice(0,10)} → ${d.period.to.slice(0,10)}`
+            : '—';
+        const actions = Object.entries(d.by_action||{}).map(([a,s])=>`
+            <div class="report-row">
+                <span class="report-row-label">${esc(a)}</span>
+                <div class="report-row-vals">
+                    <span class="report-ok">✓ ${s.success}</span>
+                    <span class="report-fail">✗ ${s.failure}</span>
+                    <span class="report-total">${s.total} total</span>
+                </div>
+            </div>`).join('') || '<span class="pid">Aucune action</span>';
+        const users = Object.entries(d.by_user||{}).map(([u,n])=>`
+            <div class="report-row">
+                <span class="report-row-label">${esc(u)}</span>
+                <span class="report-total">${n} action${n>1?'s':''}</span>
+            </div>`).join('') || '<span class="pid">—</span>';
+        document.getElementById('report-body').innerHTML = `
+            <div class="report-period" style="margin-bottom:14px">Periode : ${esc(period)} — source : ${esc(d.source||'?')}</div>
+            <div class="report-grid">
+                <div class="report-stat">
+                    <div class="report-stat-value">${d.total}</div>
+                    <div class="report-stat-label">Actions totales</div>
+                </div>
+                <div class="report-stat">
+                    <div class="report-stat-value" style="color:var(--success)">${d.success}</div>
+                    <div class="report-stat-label">Succes</div>
+                </div>
+                <div class="report-stat">
+                    <div class="report-stat-value" style="color:${d.failure>0?'var(--danger)':'var(--text-muted)'}">${d.failure}</div>
+                    <div class="report-stat-label">Echecs</div>
+                </div>
+            </div>
+            <div class="report-section">
+                <div class="report-section-title">Actions par type</div>
+                ${actions}
+            </div>
+            <div class="report-section">
+                <div class="report-section-title">Actions par source IP</div>
+                ${users}
+            </div>
+            <div style="margin-top:14px;display:flex;gap:8px">
+                <button class="btn btn-primary" style="font-size:12px;padding:5px 14px"
+                    onclick="window.location='/api/audit/report?source=${encodeURIComponent(src)}&format=csv'">
+                    Exporter CSV
+                </button>
+                <button class="btn-action" onclick="closeReport()">Fermer</button>
+            </div>`;
+    }catch(e){ document.getElementById('report-body').innerHTML='<span style="color:var(--danger)">Erreur: '+esc(e.message)+'</span>'; }
+}
+function closeReport(){ document.getElementById('report-modal').classList.remove('open'); }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeReport(); });
+
+/* ── init + auto-refresh ── */
+loadActive();
+loadArchivesList();
+setInterval(()=>{ if(_currentSource==='active') loadActive(); }, 10000);
 </script>
 {% endblock %}

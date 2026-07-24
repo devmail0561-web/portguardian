@@ -378,9 +378,87 @@ def api_global_stats():
 @app.route("/api/audit")
 @require_auth
 def api_audit():
-    """Journal d'audit des actions."""
+    """Journal d'audit — entrées récentes (fichier actif)."""
     limit = request.args.get("limit", 50, type=int)
     return jsonify(get_recent_audit(limit))
+
+
+@app.route("/api/audit/download")
+@require_auth
+def api_audit_download():
+    """Télécharge le fichier audit actif en JSON-lines."""
+    from flask import Response
+    from server.audit import LOG_DIR
+    path = LOG_DIR / "audit.jsonl"
+    content = path.read_text(encoding="utf-8") if path.exists() else ""
+    return Response(
+        content,
+        mimetype="application/x-ndjson",
+        headers={"Content-Disposition": 'attachment; filename="audit.jsonl"'},
+    )
+
+
+@app.route("/api/audit/archives")
+@require_auth
+def api_audit_archives():
+    """Liste des archives audit disponibles."""
+    from server.audit import list_archives
+    return jsonify(list_archives())
+
+
+@app.route("/api/audit/archives/<name>")
+@require_auth
+def api_audit_archive_download(name: str):
+    """Télécharge une archive audit (.jsonl.gz)."""
+    import re
+    from flask import Response, send_file
+    from server.audit import LOG_DIR
+    # Validation stricte du nom — uniquement audit.DATE.jsonl.gz
+    if not re.fullmatch(r"audit\.\d{4}-\d{2}-\d{2}_\d{6}\.jsonl\.gz", name):
+        abort(400)
+    path = LOG_DIR / name
+    if not path.exists():
+        abort(404)
+    return send_file(path, mimetype="application/gzip",
+                     as_attachment=True, download_name=name)
+
+
+@app.route("/api/audit/report")
+@require_auth
+def api_audit_report():
+    """Génère un rapport de synthèse sur les actions d'audit."""
+    from server.audit import get_recent_audit, read_archive, generate_report, list_archives
+    source = request.args.get("source", "active")  # active | <archive_name> | all
+    fmt = request.args.get("format", "json")  # json | csv
+
+    if source == "active":
+        entries = get_recent_audit(1000)
+    elif source == "all":
+        entries = get_recent_audit(1000)
+        for arch in list_archives():
+            entries += read_archive(arch["name"])
+        entries.sort(key=lambda e: e.get("timestamp", 0))
+    else:
+        entries = read_archive(source)
+
+    report = generate_report(entries)
+    report["source"] = source
+    report["entries_count"] = len(entries)
+
+    if fmt == "csv":
+        import csv, io
+        out = io.StringIO()
+        w = csv.writer(out)
+        w.writerow(["iso_time", "user", "action", "params", "result", "success"])
+        for e in entries:
+            w.writerow([e.get("iso_time",""), e.get("user",""), e.get("action",""),
+                        json.dumps(e.get("params",{}), ensure_ascii=False),
+                        e.get("result",""), e.get("success",False)])
+        from flask import Response
+        return Response(out.getvalue(), mimetype="text/csv",
+                        headers={"Content-Disposition": 'attachment; filename="audit_report.csv"'})
+
+    return jsonify(report)
 
 
 @app.route("/api/firewall/rules")
