@@ -10,6 +10,29 @@ LOG_DIR = Path.home() / ".config" / "portguardian" / "logs"
 
 _lock = threading.Lock()
 _ring: deque[dict] = deque(maxlen=1000)
+_loaded = False
+
+
+def _load_from_disk() -> None:
+    """Charge les dernières entrées du fichier audit au démarrage."""
+    global _loaded
+    if _loaded:
+        return
+    _loaded = True
+    path = LOG_DIR / "audit.jsonl"
+    if not path.exists():
+        return
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for line in lines[-1000:]:
+            line = line.strip()
+            if line:
+                try:
+                    _ring.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
+    except OSError:
+        pass
 
 
 def log_action(
@@ -19,6 +42,7 @@ def log_action(
     success: bool,
     user: str = "unknown",
 ) -> None:
+    _load_from_disk()
     entry = {
         "timestamp": time.time(),
         "iso_time": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
@@ -41,6 +65,7 @@ def log_action(
 
 
 def get_recent_audit(limit: int = 50) -> list[dict]:
+    _load_from_disk()
     with _lock:
         entries = list(_ring)
     return list(reversed(entries[-limit:]))

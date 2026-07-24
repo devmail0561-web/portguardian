@@ -1,99 +1,190 @@
 {% extends "base.html" %}
 {% block title %}Audit{% endblock %}
 
+{% block head %}
+<style>
+.audit-layout {
+    display: flex; flex-direction: column;
+    height: calc(100vh - 60px);
+    padding: 14px 20px 14px; gap: 10px; overflow: hidden;
+}
+.audit-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.audit-info {
+    background: var(--bg-card); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg); padding: 10px 16px;
+    font-size: 12px; color: var(--text-muted);
+    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.audit-info svg { width: 14px; height: 14px; opacity: .6; flex-shrink: 0; }
+.audit-table-wrap {
+    flex: 1; min-height: 0;
+    background: var(--bg-card); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg); display: flex; flex-direction: column; overflow: hidden;
+}
+.audit-table-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0;
+}
+.audit-scroll { overflow-y: auto; flex: 1; }
+.audit-empty {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 100%; gap: 10px;
+    color: var(--text-muted); text-align: center; padding: 40px;
+}
+.audit-empty svg { opacity: .3; margin-bottom: 4px; }
+.audit-empty h3 { font-size: 14px; color: var(--text-secondary); }
+.audit-empty p { font-size: 12px; max-width: 360px; line-height: 1.6; }
+.audit-empty code {
+    display: inline-block; background: var(--bg-tertiary); padding: 2px 7px;
+    border-radius: 4px; font-family: var(--font-mono); font-size: 11px;
+    color: var(--accent); border: 1px solid var(--border-subtle);
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="breadcrumb">
-    <a href="/">Dashboard</a>
-    <span class="breadcrumb-sep">&#x203a;</span>
-    <span class="breadcrumb-current">Audit</span>
-</div>
+<div class="audit-layout">
 
-<div class="page-header">
-    <div>
-        <h2 class="page-title">Journal d'audit</h2>
-        <p class="page-subtitle" id="audit-subtitle">{{ entries|length }} action{{ 's' if entries|length > 1 }}</p>
+    <div class="audit-header">
+        <div>
+            <div class="breadcrumb" style="margin-bottom:2px">
+                <a href="/">Dashboard</a><span class="breadcrumb-sep">›</span>
+                <span class="breadcrumb-current">Audit</span>
+            </div>
+            <h2 class="page-title" style="line-height:1.1">Journal d'audit</h2>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+            <span class="pid" id="audit-subtitle">{{ entries|length }} action{{ 's' if entries|length > 1 }}</span>
+            <input type="text" class="table-filter" placeholder="Filtrer..." id="audit-filter" style="width:140px">
+        </div>
     </div>
-    <div class="table-actions">
-        <input type="text" class="table-filter" placeholder="Filtrer..." id="audit-filter">
-    </div>
-</div>
 
-<div class="table-container">
-    <table id="audit-table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Source</th>
-                <th>Action</th>
-                <th>Parametres</th>
-                <th>Resultat</th>
-                <th>Statut</th>
-            </tr>
-        </thead>
-        <tbody id="audit-body">
-            {% for entry in entries %}
-            <tr>
-                <td class="mono">{{ entry.iso_time }}</td>
-                <td>{{ entry.user }}</td>
-                <td><span class="badge-action">{{ entry.action }}</span></td>
-                <td class="mono">{{ entry.params }}</td>
-                <td>{{ entry.result[:80] if entry.result else '' }}</td>
-                <td>
-                    {% if entry.success %}
-                    <span class="badge badge-success-sm">OK</span>
-                    {% else %}
-                    <span class="badge badge-error-sm">FAIL</span>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-            {% if not entries %}
-            <tr><td colspan="6" class="empty-cell">Aucune action enregistree</td></tr>
-            {% endif %}
-        </tbody>
-    </table>
+    <div class="audit-info">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        Ce journal enregistre toutes les actions administratives effectuees depuis le dashboard :
+        <code>kill</code> processus, <code>block-port</code>, <code>block-ip</code>, gestion de services, commandes distantes vers les agents.
+        Persistant entre les redemarrages — stocke dans <code>~/.config/portguardian/logs/audit.jsonl</code>.
+    </div>
+
+    <div class="audit-table-wrap">
+        <div class="audit-table-header">
+            <span class="table-title">Actions enregistrees</span>
+            <span class="table-count" id="audit-count">{{ entries|length }}</span>
+        </div>
+
+        {% if entries %}
+        <div class="audit-scroll">
+            <table id="audit-table" style="width:100%;border-collapse:collapse">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Source IP</th>
+                        <th>Action</th>
+                        <th>Parametres</th>
+                        <th>Resultat</th>
+                        <th>Statut</th>
+                    </tr>
+                </thead>
+                <tbody id="audit-body">
+                    {% for entry in entries %}
+                    <tr>
+                        <td class="mono">{{ entry.iso_time }}</td>
+                        <td class="mono">{{ entry.user }}</td>
+                        <td><span class="badge-action">{{ entry.action }}</span></td>
+                        <td class="mono" style="max-width:260px;overflow:hidden;text-overflow:ellipsis" title="{{ entry.params }}">{{ entry.params }}</td>
+                        <td>{{ entry.result[:80] if entry.result else '' }}</td>
+                        <td>
+                            {% if entry.success %}<span class="badge badge-success-sm">OK</span>
+                            {% else %}<span class="badge badge-error-sm">FAIL</span>{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="audit-empty" id="audit-empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <h3>Aucune action enregistree</h3>
+            <p>
+                L'audit se remplit quand vous effectuez des actions depuis le dashboard :
+                terminer un processus, bloquer un port ou une IP, gerer un service, envoyer une commande a un agent distant.
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+    function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
     let _auditFilter = '';
-    const filter = document.getElementById('audit-filter');
-    if (filter) {
-        filter.addEventListener('input', function() {
-            _auditFilter = this.value.toLowerCase();
-            applyAuditFilter();
-        });
-    }
-    function applyAuditFilter() {
-        document.querySelectorAll('#audit-table tbody tr').forEach(row => {
+    document.getElementById('audit-filter').addEventListener('input', function(){
+        _auditFilter = this.value.toLowerCase();
+        applyAuditFilter();
+    });
+    function applyAuditFilter(){
+        document.querySelectorAll('#audit-table tbody tr').forEach(row=>{
             row.style.display = row.textContent.toLowerCase().includes(_auditFilter) ? '' : 'none';
         });
     }
 
-    async function refreshAudit() {
-        try {
-            const resp = await fetch('/api/audit?limit=100');
-            if (!resp.ok) return;
+    async function refreshAudit(){
+        try{
+            const resp = await fetch('/api/audit?limit=200');
+            if(!resp.ok) return;
+            const ct = resp.headers.get('content-type')||'';
+            if(!ct.includes('application/json')){ window.location.href='/login'; return; }
             const entries = await resp.json();
-            const tbody = document.getElementById('audit-body');
-            document.getElementById('audit-subtitle').textContent = entries.length + ' action' + (entries.length > 1 ? 's' : '');
-            if (entries.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="empty-cell">Aucune action enregistree</td></tr>';
+
+            document.getElementById('audit-subtitle').textContent = entries.length + ' action' + (entries.length>1?'s':'');
+            document.getElementById('audit-count').textContent = entries.length;
+
+            // Affiche l'empty state ou la table
+            const empty = document.getElementById('audit-empty');
+            let tbody = document.getElementById('audit-body');
+
+            if(!entries.length){
+                if(empty) empty.style.display='flex';
+                if(tbody) tbody.closest('table').style.display='none';
                 return;
             }
-            function esc(s) { return String(s||'').replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
-            tbody.innerHTML = entries.map(e => `<tr>
+            if(empty) empty.style.display='none';
+
+            // Crée la table si elle n'existait pas (premier chargement avec entries vides)
+            if(!tbody){
+                const wrap = document.querySelector('.audit-scroll') || (() => {
+                    const d = document.createElement('div');
+                    d.className = 'audit-scroll';
+                    document.querySelector('.audit-table-wrap').appendChild(d);
+                    return d;
+                })();
+                wrap.innerHTML = `<table id="audit-table" style="width:100%;border-collapse:collapse">
+                    <thead><tr>
+                        <th>Date</th><th>Source IP</th><th>Action</th>
+                        <th>Parametres</th><th>Resultat</th><th>Statut</th>
+                    </tr></thead>
+                    <tbody id="audit-body"></tbody>
+                </table>`;
+                tbody = document.getElementById('audit-body');
+            }
+
+            tbody.innerHTML = entries.map(e=>`<tr>
                 <td class="mono">${esc(e.iso_time)}</td>
-                <td>${esc(e.user)}</td>
+                <td class="mono">${esc(e.user)}</td>
                 <td><span class="badge-action">${esc(e.action)}</span></td>
-                <td class="mono">${esc(typeof e.params === 'object' ? JSON.stringify(e.params) : e.params)}</td>
-                <td>${esc(String(e.result||'').substring(0, 80))}</td>
-                <td>${e.success ? '<span class="badge badge-success-sm">OK</span>' : '<span class="badge badge-error-sm">FAIL</span>'}</td>
+                <td class="mono" style="max-width:260px;overflow:hidden;text-overflow:ellipsis" title="${esc(typeof e.params==='object'?JSON.stringify(e.params):e.params)}">${esc(typeof e.params==='object'?JSON.stringify(e.params):e.params)}</td>
+                <td>${esc(String(e.result||'').substring(0,80))}</td>
+                <td>${e.success?'<span class="badge badge-success-sm">OK</span>':'<span class="badge badge-error-sm">FAIL</span>'}</td>
             </tr>`).join('');
             applyAuditFilter();
-        } catch(e) {}
+        }catch(e){}
     }
+
+    refreshAudit();
     setInterval(refreshAudit, 5000);
 </script>
 {% endblock %}
