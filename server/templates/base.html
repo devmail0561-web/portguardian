@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PortGuardian — {% block title %}Dashboard{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="app-layout">
+        <nav class="topbar">
+            <div class="topbar-brand">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <h1>PortGuardian<span>v{{ version }}</span></h1>
+            </div>
+            <div class="topbar-right">
+                <div class="refresh-indicator">
+                    <span class="dot" id="live-dot"></span>
+                    <span id="live-label">Live</span>
+                </div>
+                <span class="topbar-time" id="clock"></span>
+                <a href="/logout" class="nav-link logout">Logout</a>
+            </div>
+        </nav>
+
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Navigation</div>
+                <ul class="sidebar-nav">
+                    <li>
+                        <a href="/" class="{% if active_page == 'dashboard' %}active{% endif %}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/events" class="{% if active_page == 'events' %}active{% endif %}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                            Evenements
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/firewall" class="{% if active_page == 'firewall' %}active{% endif %}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            Firewall
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/audit" class="{% if active_page == 'audit' %}active{% endif %}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                            Audit
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            {% block sidebar_extra %}{% endblock %}
+        </aside>
+
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script>
+        (function() {
+            function updateClock() {
+                const el = document.getElementById('clock');
+                if (el) el.textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            }
+            updateClock();
+            setInterval(updateClock, 1000);
+        })();
+    </script>
+    <script src="/static/actions.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
