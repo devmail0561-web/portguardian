@@ -9,14 +9,22 @@
     padding: 14px 20px 0; gap: 10px;
 }
 .fw-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-.fw-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; overflow: hidden; }
-.fw-col { display: flex; flex-direction: column; min-height: 0; gap: 12px; }
-.fw-col .table-container {
+.fw-body {
+    flex: 1; min-height: 0;
+    display: grid; grid-template-columns: 1fr 340px; gap: 12px; overflow: hidden;
+}
+.fw-left { display: flex; flex-direction: column; min-height: 0; gap: 0; }
+.fw-left .table-container {
     flex: 1; min-height: 0; overflow: hidden; display: flex;
     flex-direction: column; margin-bottom: 0;
 }
-.fw-col .table-header { flex-shrink: 0; }
+.fw-left .table-header { flex-shrink: 0; }
 .fw-scroll { overflow-y: auto; flex: 1; }
+
+.fw-right {
+    display: flex; flex-direction: column; gap: 10px; overflow-y: auto;
+    padding-bottom: 16px;
+}
 
 .form-panel {
     background: var(--bg-card); border: 1px solid var(--border-subtle);
@@ -59,6 +67,12 @@
     color: var(--accent); padding: 6px 12px; border-radius: var(--radius-md);
     font-size: 11px; flex-shrink: 0;
 }
+.fw-placeholder {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; gap: 10px; color: var(--text-muted); text-align: center; padding: 40px;
+}
+.fw-placeholder svg { opacity: .2; width: 40px; height: 40px; }
+.fw-placeholder p { font-size: 12px; max-width: 280px; line-height: 1.6; }
 </style>
 {% endblock %}
 
@@ -73,14 +87,17 @@
             </div>
             <h2 class="page-title" style="line-height:1.1">Firewall</h2>
         </div>
-        <div style="display:flex;align-items:center;gap:12px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
             <label class="pid" style="font-size:12px">Machine :</label>
             <select class="host-select" id="host-select" onchange="onHostChange()">
                 <option value="">-- Choisir une machine --</option>
             </select>
-            <span class="pid">Backend: <span class="badge-proto" id="fw-backend">--</span></span>
-            <span class="pid"><span class="badge-proto" id="fw-count">0</span> règle(s)</span>
-            <button class="btn-action" onclick="refreshRules()">Actualiser</button>
+            <span id="fw-meta" style="display:none">
+                <span class="pid">Backend: <span class="badge-proto" id="fw-backend">--</span></span>
+                &nbsp;
+                <span class="pid"><span class="badge-proto" id="fw-count">0</span> regle(s)</span>
+            </span>
+            <button class="btn-action" id="fw-refresh-btn" style="display:none" onclick="refreshRules()">Actualiser</button>
         </div>
     </div>
 
@@ -90,13 +107,12 @@
     </div>
 
     <div id="remote-note" class="remote-note" style="display:none">
-        Les actions de blocage/deblocage sont envoyees a l'agent distant via la queue de commandes.
-        L'agent les applique au prochain cycle et met a jour les regles dans son snapshot.
+        Les actions sont envoyees a l'agent distant via la queue de commandes. L'agent les applique au prochain cycle.
     </div>
 
     <div class="fw-body">
         <!-- Left: rules list -->
-        <div class="fw-col">
+        <div class="fw-left">
             <div class="table-container">
                 <div class="table-header">
                     <div>
@@ -105,23 +121,25 @@
                     </div>
                     <input type="text" class="table-filter" placeholder="Filtrer..." id="rules-filter" style="width:130px">
                 </div>
-                <div class="fw-scroll">
-                    <table id="rules-table">
-                        <thead><tr><th>#</th><th>Type</th><th>Regle</th><th>Action</th></tr></thead>
-                        <tbody id="rules-body">
-                            <tr><td colspan="4" class="empty-cell">Choisissez une machine</td></tr>
-                        </tbody>
+                <div class="fw-scroll" id="fw-rules-wrap">
+                    <div class="fw-placeholder" id="fw-placeholder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <p>Choisissez une machine pour voir ses regles firewall et effectuer des actions.</p>
+                    </div>
+                    <table id="rules-table" style="display:none">
+                        <thead><tr><th>#</th><th>Type</th><th>Regle</th><th>Actions</th></tr></thead>
+                        <tbody id="rules-body"></tbody>
                     </table>
                 </div>
             </div>
         </div>
 
         <!-- Right: forms -->
-        <div class="fw-col">
+        <div class="fw-right">
             <div class="form-panel">
                 <div class="form-panel-header">
                     <span>Bloquer un port</span>
-                    <span class="pid">DROP entrant/sortant</span>
+                    <span class="pid" style="font-size:10px">DROP entrant/sortant</span>
                 </div>
                 <div class="form-panel-body">
                     <div class="form-row">
@@ -153,7 +171,7 @@
             <div class="form-panel">
                 <div class="form-panel-header">
                     <span>Bloquer une IP</span>
-                    <span class="pid">DROP toutes connexions</span>
+                    <span class="pid" style="font-size:10px">DROP toutes connexions</span>
                 </div>
                 <div class="form-panel-body">
                     <div class="form-row">
@@ -177,7 +195,7 @@
             <div class="form-panel">
                 <div class="form-panel-header">
                     <span>Debloquer un port</span>
-                    <span class="pid">Supprimer la regle DROP</span>
+                    <span class="pid" style="font-size:10px">Supprimer regle DROP</span>
                 </div>
                 <div class="form-panel-body">
                     <div class="form-row">
@@ -205,6 +223,30 @@
                     </div>
                 </div>
             </div>
+
+            <div class="form-panel">
+                <div class="form-panel-header">
+                    <span>Debloquer une IP</span>
+                    <span class="pid" style="font-size:10px">Supprimer regle DROP</span>
+                </div>
+                <div class="form-panel-body">
+                    <div class="form-row">
+                        <label>IP / CIDR</label>
+                        <input type="text" id="ui-spec" placeholder="192.168.1.100">
+                    </div>
+                    <div class="form-row">
+                        <label>Direction</label>
+                        <select id="ui-dir">
+                            <option value="in">Entrant</option>
+                            <option value="out">Sortant</option>
+                            <option value="both">Les deux</option>
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-primary" onclick="doAction('unblock-ip',{spec:v('ui-spec'),direction:v('ui-dir')},'ui-spec')">Debloquer</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -218,7 +260,6 @@ function v(id){ return document.getElementById(id).value.trim(); }
 
 let currentHost = null;
 
-/* ── populate host selector ── */
 async function loadHosts(){
     try{
         const r = await fetch('/api/hosts');
@@ -229,7 +270,7 @@ async function loadHosts(){
         hosts.forEach(h => {
             const opt = document.createElement('option');
             opt.value = h.hostname;
-            opt.textContent = h.hostname;
+            opt.textContent = h.hostname + (h.status ? ` (${h.status})` : '');
             sel.appendChild(opt);
         });
         if(hosts.length === 1){
@@ -242,14 +283,29 @@ async function loadHosts(){
 function onHostChange(){
     currentHost = document.getElementById('host-select').value || null;
     const note = document.getElementById('remote-note');
+    const meta = document.getElementById('fw-meta');
+    const btn  = document.getElementById('fw-refresh-btn');
     note.style.display = currentHost ? '' : 'none';
-    if(currentHost) refreshRules();
-    else {
-        document.getElementById('rules-body').innerHTML = '<tr><td colspan="4" class="empty-cell">Choisissez une machine</td></tr>';
+    meta.style.display = currentHost ? '' : 'none';
+    btn.style.display  = currentHost ? '' : 'none';
+    if(currentHost){
+        refreshRules();
+    } else {
+        showPlaceholder();
         document.getElementById('fw-backend').textContent = '--';
         document.getElementById('fw-count').textContent = '0';
+        document.getElementById('rules-count').textContent = '';
         hideError();
     }
+}
+
+function showPlaceholder(){
+    document.getElementById('fw-placeholder').style.display = 'flex';
+    document.getElementById('rules-table').style.display  = 'none';
+}
+function hidePlaceholder(){
+    document.getElementById('fw-placeholder').style.display = 'none';
+    document.getElementById('rules-table').style.display  = '';
 }
 
 function classifyRule(rule){
@@ -263,28 +319,36 @@ async function refreshRules(){
     if(!currentHost) return;
     try{
         const r = await fetch('/api/hosts/'+encodeURIComponent(currentHost)+'/firewall');
-        if(!r.ok){ showError('Machine "'+currentHost+'" introuvable ou hors ligne'); return; }
+        if(!r.ok){ showError('Machine "'+currentHost+'" introuvable ou hors ligne'); showPlaceholder(); return; }
         const data = await r.json();
         if(data.error){ showError('Firewall: '+data.error); }
         else hideError();
 
         document.getElementById('fw-backend').textContent = data.backend || 'aucun';
-        document.getElementById('fw-count').textContent = data.rules.length;
-        document.getElementById('rules-count').textContent = data.rules.length + ' regle(s)';
+        document.getElementById('fw-count').textContent = (data.rules||[]).length;
+        document.getElementById('rules-count').textContent = (data.rules||[]).length + ' regle(s)';
 
         const tbody = document.getElementById('rules-body');
-        if(!data.rules.length){
-            tbody.innerHTML = '<tr><td colspan="4" class="empty-cell">Aucune regle de blocage active</td></tr>';
+        if(!data.rules || !data.rules.length){
+            hidePlaceholder();
+            // On affiche le tableau mais avec un message d'etat sain
+            tbody.innerHTML = `<tr><td colspan="4">
+                <div style="display:flex;align-items:center;gap:8px;padding:16px 14px;color:var(--success);font-size:12px">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+                    Aucune regle de blocage active — le firewall est propre.
+                </div>
+            </td></tr>`;
             return;
         }
+        hidePlaceholder();
         tbody.innerHTML = data.rules.map((rule,i) => {
             const [label,cls] = classifyRule(rule);
             return `<tr>
                 <td class="mono" style="color:var(--text-muted);width:28px">${i+1}</td>
                 <td><span class="rule-type ${cls}">${label}</span></td>
-                <td class="mono" style="max-width:280px;overflow:hidden;text-overflow:ellipsis" title="${esc(rule)}">${esc(rule)}</td>
+                <td class="mono" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;font-size:11px" title="${esc(rule)}">${esc(rule)}</td>
                 <td class="actions-cell">
-                    <button class="btn-action btn-kill" onclick="quickUnblock('${esc(rule)}')">Retirer</button>
+                    <button class="btn-action btn-kill" onclick="quickUnblock('${esc(rule).replace(/'/g,"\\'")}')">Retirer</button>
                 </td>
             </tr>`;
         }).join('');
@@ -304,7 +368,6 @@ document.getElementById('rules-filter').addEventListener('input', function(){
     });
 });
 
-/* ── send action to agent (via command queue) ── */
 async function sendToAgent(action, params){
     if(!currentHost){
         Actions.showToast('Choisissez une machine d\'abord', true);
@@ -327,6 +390,7 @@ async function sendToAgent(action, params){
 
 async function doAction(action, params, clearFieldId){
     if(!params.spec){ Actions.showToast('Champ requis manquant', true); return; }
+    if(!currentHost){ Actions.showToast('Choisissez une machine d\'abord', true); return; }
     const ok = await sendToAgent(action, params);
     if(ok){
         if(clearFieldId) document.getElementById(clearFieldId).value = '';

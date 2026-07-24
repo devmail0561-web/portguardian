@@ -46,7 +46,6 @@
 svg.linechart { display: block; width: 100%; height: 52px; overflow: visible; }
 .lc-area { opacity: .15; }
 .lc-line { fill: none; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
-.lc-dot { r: 3; }
 
 /* main row */
 .dash-main {
@@ -82,54 +81,95 @@ svg.linechart { display: block; width: 100%; height: 52px; overflow: visible; }
 }
 .dash-right .chart-card { flex-shrink: 0; }
 
-/* notifications */
-.notif-panel {
-    background: var(--bg-card); border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg); flex: 1; min-height: 0;
-    display: flex; flex-direction: column; overflow: hidden;
+/* notification bell button */
+.notif-btn-wrap {
+    position: relative; display: inline-flex; align-items: center;
 }
-.notif-header {
-    padding: 8px 12px; border-bottom: 1px solid var(--border-subtle);
+.notif-bell-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px; font-size: 12px; font-weight: 600;
+    background: var(--bg-card); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md); color: var(--text-secondary); cursor: pointer;
+    transition: all var(--transition); position: relative;
+}
+.notif-bell-btn:hover { border-color: var(--accent); color: var(--accent); }
+.notif-bell-btn svg { width: 14px; height: 14px; }
+.notif-bell-count {
+    display: none; position: absolute; top: -5px; right: -5px;
+    background: var(--danger); color: #fff; font-size: 9px; font-weight: 700;
+    width: 16px; height: 16px; border-radius: 50%; align-items: center; justify-content: center;
+    line-height: 1;
+}
+.notif-bell-count.visible { display: flex; }
+
+/* notification modal */
+.notif-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,.55);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 200ms;
+}
+.notif-modal.open { opacity: 1; pointer-events: auto; }
+.notif-box {
+    background: var(--bg-card); border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg); width: min(560px, 95vw); max-height: 75vh;
+    display: flex; flex-direction: column; box-shadow: var(--shadow-lg);
+}
+.notif-modal-header {
+    padding: 14px 18px; border-bottom: 1px solid var(--border-subtle);
     display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
 }
-.notif-title { font-size: 12px; font-weight: 600; }
-.notif-badge {
-    font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px;
-    background: var(--danger-subtle); color: var(--danger);
+.notif-modal-title { font-size: 14px; font-weight: 600; }
+.notif-modal-close {
+    background: none; border: none; color: var(--text-muted);
+    font-size: 16px; cursor: pointer; padding: 2px 6px; border-radius: 3px;
 }
-.notif-badge.empty { background: var(--bg-tertiary); color: var(--text-muted); }
-.notif-list { overflow-y: auto; flex: 1; }
+.notif-modal-close:hover { background: var(--bg-tertiary); }
+.notif-modal-list { overflow-y: auto; flex: 1; padding: 8px 0; }
+
+/* notification items */
 .notif-item {
-    display: flex; align-items: flex-start; gap: 8px;
-    padding: 7px 12px; border-left: 3px solid transparent;
-    transition: background var(--transition);
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 18px; border-left: 3px solid transparent;
+    cursor: pointer; transition: background var(--transition);
 }
-.notif-item:hover { background: rgba(59,130,246,.04); }
+.notif-item:hover { background: rgba(59,130,246,.06); }
 .notif-item.sev-critical { border-left-color: var(--danger); }
 .notif-item.sev-warning  { border-left-color: var(--warning); }
 .notif-item.sev-info     { border-left-color: var(--accent); }
 .notif-dot {
-    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 5px;
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px;
 }
-.sev-critical .notif-dot { background: var(--danger); box-shadow: 0 0 4px var(--danger); }
+.sev-critical .notif-dot { background: var(--danger); box-shadow: 0 0 5px var(--danger); }
 .sev-warning  .notif-dot { background: var(--warning); }
 .sev-info     .notif-dot { background: var(--accent); }
 .notif-body { flex: 1; min-width: 0; }
-.notif-msg { font-size: 11px; color: var(--text-primary); line-height: 1.4; }
-.notif-meta { display: flex; gap: 5px; margin-top: 2px; flex-wrap: wrap; }
+.notif-msg { font-size: 12px; color: var(--text-primary); line-height: 1.5; }
+.notif-meta { display: flex; gap: 6px; margin-top: 3px; flex-wrap: wrap; align-items: center; }
 .notif-host {
-    font-size: 10px; font-family: var(--font-mono); padding: 1px 4px;
+    font-size: 10px; font-family: var(--font-mono); padding: 1px 5px;
     background: var(--bg-tertiary); border-radius: 3px; color: var(--text-secondary);
 }
 .notif-time { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); }
 .notif-empty {
     display: flex; flex-direction: column; align-items: center;
-    justify-content: center; height: 100%; gap: 6px;
-    color: var(--text-muted); font-size: 11px;
+    justify-content: center; height: 120px; gap: 8px;
+    color: var(--text-muted); font-size: 12px;
 }
 .notif-empty svg { opacity: .25; }
 
-/* deploy tip — une ligne dans le coin */
+/* notif detail panel inside modal */
+.notif-detail-panel {
+    display: none; border-top: 1px solid var(--border-subtle);
+    flex-shrink: 0; padding: 14px 18px;
+}
+.notif-detail-panel.open { display: block; }
+.notif-detail-json {
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary);
+    white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto;
+    background: var(--bg-tertiary); padding: 10px; border-radius: var(--radius-md);
+}
+
+/* deploy tip */
 .deploy-tip {
     position: fixed; bottom: 16px; right: 24px; z-index: 50;
 }
@@ -171,6 +211,18 @@ svg.linechart { display: block; width: 100%; height: 52px; overflow: visible; }
     transition: all var(--transition);
 }
 .deploy-copy-btn:hover { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent); }
+
+/* util bar inline in table */
+.util-bar { display: inline-flex; align-items: center; gap: 5px; }
+.util-track { width: 44px; height: 5px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden; flex-shrink: 0; }
+.util-fill { height: 100%; border-radius: 3px; transition: width .4s; }
+.util-fill.low  { background: var(--success); }
+.util-fill.med  { background: var(--warning); }
+.util-fill.high { background: var(--danger); }
+.util-label { font-family: var(--font-mono); font-size: 11px; }
+.util-label.low  { color: var(--success); }
+.util-label.med  { color: var(--warning); font-weight: 600; }
+.util-label.high { color: var(--danger);  font-weight: 700; }
 </style>
 {% endblock %}
 
@@ -226,10 +278,21 @@ svg.linechart { display: block; width: 100%; height: 52px; overflow: visible; }
         <div class="stat-card">
             <div class="stat-card-header">
                 <span class="stat-card-label">Alertes</span>
-                <div class="stat-card-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg></div>
+                <div class="stat-card-icon red">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                </div>
             </div>
-            <div class="stat-card-value" id="s-events">{{ events|list|length }}</div>
-            <div class="stat-card-sub">evenements recents</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+                <div class="stat-card-value" id="s-events">{{ events|list|length }}</div>
+                <!-- Bouton cloche notifications -->
+                <div class="notif-btn-wrap">
+                    <button class="notif-bell-btn" onclick="openNotifModal()" title="Voir les alertes">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                        Alertes
+                    </button>
+                    <span class="notif-bell-count" id="notif-bell-count">0</span>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -258,7 +321,7 @@ svg.linechart { display: block; width: 100%; height: 52px; overflow: visible; }
     <!-- ── Main ── -->
     <div class="dash-main">
 
-        <!-- Table machines -->
+        <!-- Table machines — lignes cliquables -->
         <div class="dash-table-wrap">
             <div class="table-container">
                 <div class="table-header">
@@ -277,11 +340,11 @@ svg.linechart { display: block; width: 100%; height: 52px; overflow: visible; }
                                 <th>Ports</th><th>CPU</th><th>Mem</th><th>Alertes</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="hosts-tbody">
                             {% for host in hosts %}
-                            <tr>
+                            <tr class="machine-row" onclick="window.location='/host/{{ host.hostname }}'">
                                 <td><span class="badge badge-{{ host.status }}"><span class="badge-dot"></span>{{ host.status }}</span></td>
-                                <td><a href="/host/{{ host.hostname }}" class="host-link">{{ host.hostname }}</a></td>
+                                <td><span class="host-link">{{ host.hostname }}</span></td>
                                 <td><span class="port-num">{{ host.connections }}</span></td>
                                 <td><span class="port-num">{{ host.listening }}</span></td>
                                 <td><span class="pid">—</span></td>
@@ -302,33 +365,48 @@ svg.linechart { display: block; width: 100%; height: 52px; overflow: visible; }
             </div>
         </div>
 
-        <!-- Right: barres par machine + notifs -->
+        <!-- Right: barres par machine -->
         <div class="dash-right">
-
             <div class="chart-card">
                 <div class="chart-title" style="margin-bottom:8px">Connexions par machine</div>
                 <div class="bar-chart" id="chart-conns">
                     <span class="pid" style="font-size:11px">—</span>
                 </div>
             </div>
-
-            <div class="notif-panel">
-                <div class="notif-header">
-                    <span class="notif-title">Alertes recentes</span>
-                    <span class="notif-badge empty" id="notif-count">0</span>
-                </div>
-                <div class="notif-list" id="notif-list">
-                    <div class="notif-empty">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
-                        <span>Aucune alerte</span>
-                    </div>
+            <div class="chart-card" style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column">
+                <div class="chart-title" style="margin-bottom:8px;flex-shrink:0">Charge CPU par machine</div>
+                <div class="bar-chart" id="chart-cpu" style="flex:1;overflow-y:auto">
+                    <span class="pid" style="font-size:11px">—</span>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ── Deploy tip — bouton fixe en bas a droite ── -->
+<!-- ── Notification modal ── -->
+<div class="notif-modal" id="notif-modal" onclick="if(event.target===this)closeNotifModal()">
+    <div class="notif-box">
+        <div class="notif-modal-header">
+            <span class="notif-modal-title">Alertes recentes</span>
+            <button class="notif-modal-close" onclick="closeNotifModal()">✕</button>
+        </div>
+        <div class="notif-modal-list" id="notif-modal-list">
+            <div class="notif-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                <span>Aucune alerte</span>
+            </div>
+        </div>
+        <div class="notif-detail-panel" id="notif-detail-panel">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted)">Detail</span>
+                <button onclick="closeNotifDetail()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px">✕</button>
+            </div>
+            <div class="notif-detail-json" id="notif-detail-json"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Deploy tip ── -->
 <div class="deploy-tip" id="deploy-tip">
     <button class="deploy-tip-btn" onclick="toggleDeploy()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
@@ -376,6 +454,25 @@ document.getElementById('host-filter').addEventListener('input', function(){
     });
 });
 
+/* ── util bar ── */
+function utilBar(pct){
+    if(pct === null || pct === undefined) return '<span class="pid">—</span>';
+    const p = Math.round(pct);
+    const cls = p >= 80 ? 'high' : p >= 50 ? 'med' : 'low';
+    return `<span class="util-bar">
+        <span class="util-track"><span class="util-fill ${cls}" style="width:${Math.min(p,100)}%"></span></span>
+        <span class="util-label ${cls}">${p}%</span>
+    </span>`;
+}
+
+/* ── row severity class ── */
+function rowClass(cpu, mem){
+    const max = Math.max(cpu||0, mem||0);
+    if(max >= 80) return 'row-crit';
+    if(max >= 50) return 'row-warn';
+    return '';
+}
+
 /* ── line chart SVG ── */
 function drawLineChart(svgId, values, color, currentId){
     const svg = document.getElementById(svgId);
@@ -410,50 +507,80 @@ function drawLineChart(svgId, values, color, currentId){
 }
 
 /* ── bar chart ── */
-function drawBarChart(containerId, items, color){
+function drawBarChart(containerId, items, colorFn){
     const el = document.getElementById(containerId);
     if(!el) return;
     if(!items.length){ el.innerHTML='<span class="pid" style="font-size:11px">—</span>'; return; }
     const max = Math.max(...items.map(i=>i.val), 1);
-    el.innerHTML = items.slice(0,7).map(i=>{
+    el.innerHTML = items.slice(0,8).map(i=>{
         const pct = Math.round((i.val/max)*100);
-        return `<div class="bar-row">
+        const color = typeof colorFn === 'function' ? colorFn(i.val) : colorFn;
+        return `<div class="bar-row" onclick="window.location='/host/${esc(i.hostname||i.label)}'" style="cursor:pointer" title="Voir ${esc(i.hostname||i.label)}">
             <span class="bar-label" title="${esc(i.label)}">${esc(i.label)}</span>
             <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
-            <span class="bar-val">${i.val}</span>
+            <span class="bar-val">${typeof i.val === 'number' && i.val % 1 !== 0 ? i.val.toFixed(1)+'%' : i.val}</span>
         </div>`;
     }).join('');
 }
 
-/* ── notifications ── */
+function cpuColor(pct){ return pct >= 80 ? 'var(--danger)' : pct >= 50 ? 'var(--warning)' : 'var(--success)'; }
+
+/* ── notifications modal ── */
+let _notifEvents = [];
 const SEV = {critical:0, warning:1, info:2};
-function renderNotifs(events){
-    const badge = document.getElementById('notif-count');
-    badge.textContent = events.length;
-    badge.className = 'notif-badge' + (!events.length ? ' empty' : '');
-    const el = document.getElementById('notif-list');
-    if(!events.length){
+
+function openNotifModal(){
+    document.getElementById('notif-modal').classList.add('open');
+    renderNotifList();
+}
+function closeNotifModal(){
+    document.getElementById('notif-modal').classList.remove('open');
+    closeNotifDetail();
+}
+function closeNotifDetail(){
+    document.getElementById('notif-detail-panel').classList.remove('open');
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeNotifModal(); });
+
+function renderNotifList(){
+    const el = document.getElementById('notif-modal-list');
+    const badge = document.getElementById('notif-bell-count');
+    const critCount = _notifEvents.filter(e=>e.severity==='critical').length;
+    badge.textContent = _notifEvents.length;
+    badge.className = 'notif-bell-count' + (_notifEvents.length ? ' visible' : '');
+
+    if(!_notifEvents.length){
         el.innerHTML=`<div class="notif-empty">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
             <span>Aucune alerte</span></div>`;
         return;
     }
-    const sorted = [...events].sort((a,b)=>{
+    const sorted = [..._notifEvents].sort((a,b)=>{
         const sd=(SEV[a.severity]??3)-(SEV[b.severity]??3);
         return sd||((b.timestamp||0)-(a.timestamp||0));
     });
-    el.innerHTML = sorted.slice(0,40).map(e=>{
+    el.innerHTML = sorted.slice(0,60).map((e,i)=>{
         const sev = SEV[e.severity]!==undefined ? e.severity : 'info';
         const hn = e.hostname ? `<span class="notif-host">${esc(e.hostname)}</span>` : '';
-        const t  = e.iso_time ? `<span class="notif-time">${esc(String(e.iso_time).slice(11,19))}</span>` : '';
-        return `<div class="notif-item sev-${sev}">
+        const t  = e.iso_time ? `<span class="notif-time">${esc(String(e.iso_time).slice(0,19))}</span>` : '';
+        const hostLink = e.hostname ? `<a href="/host/${esc(e.hostname)}" onclick="event.stopPropagation()" style="font-size:10px;color:var(--accent);text-decoration:none;font-family:var(--font-mono)">→ voir machine</a>` : '';
+        return `<div class="notif-item sev-${sev}" onclick="showNotifDetail(${i})">
             <span class="notif-dot"></span>
             <div class="notif-body">
                 <div class="notif-msg">${esc(e.message||e.description||'-')}</div>
-                <div class="notif-meta">${hn}${t}</div>
+                <div class="notif-meta">${hn}${t}${hostLink}</div>
             </div>
         </div>`;
     }).join('');
+    _sortedNotifCache = sorted;
+}
+
+let _sortedNotifCache = [];
+function showNotifDetail(idx){
+    const e = _sortedNotifCache[idx];
+    if(!e) return;
+    document.getElementById('notif-detail-json').textContent = JSON.stringify(e, null, 2);
+    document.getElementById('notif-detail-panel').classList.add('open');
 }
 
 /* ── main refresh ── */
@@ -461,7 +588,7 @@ async function refreshDashboard(){
     try{
         const [rs, re] = await Promise.all([
             fetch('/api/stats'),
-            fetch('/api/events?limit=50'),
+            fetch('/api/events?limit=100'),
         ]);
         const ct = rs.headers.get('content-type')||'';
         if(!ct.includes('application/json')){ window.location.href='/login'; return; }
@@ -481,22 +608,24 @@ async function refreshDashboard(){
         drawLineChart('lc-conns', tl.map(p=>p.connections_total), 'var(--accent)', 'cc-current');
         drawLineChart('lc-ports', tl.map(p=>p.listening_total),   'var(--success)', 'lc-current');
 
-        // table
+        // table machines
         const machines = stats.machines || [];
-        const tbody = document.querySelector('#hosts-table tbody');
+        const tbody = document.getElementById('hosts-tbody');
         if(tbody){
             const q = document.getElementById('host-filter').value.toLowerCase();
             tbody.innerHTML = machines.map(m=>{
                 const hn  = esc(m.hostname);
+                const cpu = m.cpu_percent  != null ? m.cpu_percent  : null;
+                const mem = m.memory_percent != null ? m.memory_percent : null;
                 const ev  = m.events_count||0;
-                const cpu = m.cpu_percent  ? `<span class="pid">${m.cpu_percent.toFixed(1)}%</span>` : '<span class="pid">—</span>';
-                const mem = m.memory_percent ? `<span class="pid">${m.memory_percent.toFixed(1)}%</span>` : '<span class="pid">—</span>';
-                return `<tr>
+                const cls = rowClass(cpu, mem);
+                return `<tr class="machine-row ${cls}" onclick="window.location='/host/${hn}'" title="Voir ${hn}">
                     <td><span class="badge badge-${m.status}"><span class="badge-dot"></span>${m.status}</span></td>
-                    <td><a href="/host/${hn}" class="host-link">${hn}</a></td>
+                    <td><span class="host-link">${hn}</span></td>
                     <td><span class="port-num">${m.connections}</span></td>
                     <td><span class="port-num">${m.listening}</span></td>
-                    <td>${cpu}</td><td>${mem}</td>
+                    <td>${utilBar(cpu)}</td>
+                    <td>${utilBar(mem)}</td>
                     <td>${ev?`<span class="badge badge-stale">${ev}</span>`:'<span class="pid">—</span>'}</td>
                 </tr>`;
             }).join('');
@@ -505,13 +634,23 @@ async function refreshDashboard(){
             });
         }
 
-        // barres par machine
+        // barres connexions par machine
         drawBarChart('chart-conns',
-            machines.map(m=>({label:m.hostname, val:m.connections})).sort((a,b)=>b.val-a.val),
+            machines.map(m=>({label:m.hostname, hostname:m.hostname, val:m.connections})).sort((a,b)=>b.val-a.val),
             'var(--accent)'
         );
+        // barres CPU par machine avec coloration
+        drawBarChart('chart-cpu',
+            machines.map(m=>({label:m.hostname, hostname:m.hostname, val:m.cpu_percent||0})).sort((a,b)=>b.val-a.val),
+            i=>cpuColor(i)
+        );
 
-        renderNotifs(events);
+        // stocker events pour modal
+        _notifEvents = events;
+        // mettre a jour badge sans re-render la liste si le modal est ferme
+        const badge = document.getElementById('notif-bell-count');
+        badge.textContent = events.length;
+        badge.className = 'notif-bell-count' + (events.length ? ' visible' : '');
 
     }catch(e){}
 }

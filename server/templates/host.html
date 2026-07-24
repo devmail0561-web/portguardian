@@ -25,8 +25,12 @@
 }
 .host-stats .stat-card { padding: 10px 14px; }
 .host-stats .stat-card-value { font-size: 20px; }
-/* sparkline in stat card */
 .sparkline { display: block; width: 100%; height: 28px; margin-top: 4px; }
+
+/* CPU/mem stat card color */
+.stat-card-value.val-low  { color: var(--success); }
+.stat-card-value.val-med  { color: var(--warning); }
+.stat-card-value.val-high { color: var(--danger); font-weight: 800; }
 
 .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; }
 .tab-btn {
@@ -43,6 +47,7 @@
 }
 .tab-btn.active .tab-count { background: var(--accent-subtle); color: var(--accent); }
 .tab-count-warn { background: var(--warning-subtle) !important; color: var(--warning) !important; }
+.tab-count-crit { background: var(--danger-subtle) !important; color: var(--danger) !important; }
 
 .tab-panels { flex: 1; min-height: 0; }
 .tab-panel { display: none; height: 100%; overflow-y: auto; padding-bottom: 16px; }
@@ -50,6 +55,17 @@
 .tab-panel .table-container {
     margin-bottom: 0; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle);
 }
+
+/* util bar inline */
+.bar-wrap { display: inline-flex; align-items: center; gap: 5px; }
+.bar-bg { width: 60px; height: 6px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+.bar-ok   { background: var(--success); }
+.bar-warn { background: var(--warning); }
+.bar-crit { background: var(--danger); }
+.bar-val-low  { color: var(--success); font-family: var(--font-mono); font-size: 11px; }
+.bar-val-med  { color: var(--warning); font-family: var(--font-mono); font-size: 11px; font-weight:600; }
+.bar-val-high { color: var(--danger);  font-family: var(--font-mono); font-size: 11px; font-weight:700; }
 
 /* Process detail modal */
 .modal-overlay {
@@ -79,31 +95,23 @@
 .detail-row { display: flex; gap: 6px; align-items: baseline; font-size: 13px; }
 .detail-label { color: var(--text-muted); font-size: 11px; min-width: 80px; }
 .detail-value { color: var(--text-primary); font-family: var(--font-mono); font-size: 12px; word-break: break-all; }
-.detail-section {
-    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-subtle);
-}
+.detail-section { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-subtle); }
 .detail-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase;
     letter-spacing: .05em; color: var(--text-muted); margin-bottom: 8px; }
-.detail-list { font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary);
-    max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
-.detail-list span { padding: 2px 4px; border-radius: 3px; }
-.detail-list span:hover { background: var(--bg-tertiary); }
-
-/* bar inline */
-.bar-wrap { display: inline-flex; align-items: center; gap: 6px; }
-.bar-bg { width: 60px; height: 6px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden; }
-.bar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
-.bar-ok { background: var(--success); }
-.bar-warn { background: var(--warning); }
-.bar-crit { background: var(--danger); }
 
 /* event row clickable */
 .event-row { cursor: pointer; }
 .event-row:hover td { background: rgba(59,130,246,.06); }
-.event-detail-cell { display: none; background: var(--bg-tertiary); }
+.event-detail-cell { display: none; }
 .event-detail-cell.open { display: table-row; }
 .event-detail-box { padding: 12px 16px; font-size: 12px; font-family: var(--font-mono);
-    color: var(--text-secondary); white-space: pre-wrap; word-break: break-all; }
+    color: var(--text-secondary); white-space: pre-wrap; word-break: break-all;
+    background: var(--bg-tertiary); border-top: 1px solid var(--border-subtle); }
+
+/* machine row hover (ports/conns table) */
+tbody tr:not(.event-row):not(.event-detail-cell) { cursor: default; }
+.row-crit td { background: rgba(239,68,68,.04); }
+.row-warn td { background: rgba(245,158,11,.04); }
 </style>
 {% endblock %}
 
@@ -157,19 +165,19 @@
         </div>
         <div class="stat-card">
             <div class="stat-card-header">
+                <span class="stat-card-label">CPU</span>
+                <div class="stat-card-icon yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></div>
+            </div>
+            <div class="stat-card-value" id="stat-cpu">--</div>
+            <div class="stat-card-sub" id="stat-mem-sub" style="font-size:10px">Mem: --</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-card-header">
                 <span class="stat-card-label">Bande passante</span>
                 <div class="stat-card-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="4"/><polyline points="6 10 12 4 18 10"/></svg></div>
             </div>
             <div class="stat-card-value" id="stat-bw">--</div>
             <div class="stat-card-sub" id="stat-bw-sub" style="font-size:10px">--</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <span class="stat-card-label">Processus</span>
-                <div class="stat-card-icon yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/></svg></div>
-            </div>
-            <div class="stat-card-value" id="stat-procs">0</div>
-            <div class="stat-card-sub">reseau actifs</div>
         </div>
         <div class="stat-card">
             <div class="stat-card-header">
@@ -242,6 +250,7 @@
             <div class="table-container">
                 <div class="table-header">
                     <div><span class="table-title">Processus reseau</span><span class="table-count" id="proc-count"></span></div>
+                    <input type="text" class="table-filter" placeholder="Filtrer..." id="proc-filter">
                 </div>
                 <table id="proc-table">
                     <thead><tr>
@@ -273,11 +282,11 @@
             <div class="table-container">
                 <div class="table-header">
                     <div><span class="table-title">Evenements detectes</span><span class="table-count" id="ev-count"></span></div>
-                    <span class="table-count" style="color:var(--text-muted);font-size:11px">Cliquer pour details</span>
+                    <span class="table-count" style="color:var(--text-muted);font-size:11px">Cliquer sur une ligne pour les details</span>
                 </div>
                 <table id="ev-table">
                     <thead><tr>
-                        <th></th><th>Severite</th><th>Message</th><th>Type</th><th>Heure</th>
+                        <th style="width:20px"></th><th>Severite</th><th>Message</th><th>Type</th><th>Heure</th>
                     </tr></thead>
                     <tbody id="ev-body"><tr><td colspan="5" class="empty-cell">Aucun evenement</td></tr></tbody>
                 </table>
@@ -301,7 +310,6 @@
 
 {% block scripts %}
 <script>
-/* Toutes les actions Actions.* seront routées vers cet agent via la queue */
 window.TARGET_HOSTNAME = "{{ host.hostname }}";
 const HOSTNAME = "{{ host.hostname }}";
 
@@ -320,13 +328,21 @@ function fmtBytes(b){ if(!b||b<=0)return '0 B'; if(b>1073741824)return (b/107374
 function fmtUptime(s){ if(!s||s<=0)return '-'; if(s>86400)return Math.floor(s/86400)+'j '+Math.floor((s%86400)/3600)+'h'; if(s>3600)return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m'; return Math.floor(s/60)+'m'; }
 function stateClass(s){ return {LISTEN:'state-listen',ESTABLISHED:'state-established',TIME_WAIT:'state-time-wait',CLOSE_WAIT:'state-time-wait'}[s]||'state-other'; }
 
+function barClass(pct){ return pct>=80?'bar-crit':pct>=50?'bar-warn':'bar-ok'; }
+function valClass(pct){ return pct>=80?'bar-val-high':pct>=50?'bar-val-med':'bar-val-low'; }
+
 function cpuBar(pct){
-    const cls = pct>=80?'bar-crit':pct>=50?'bar-warn':'bar-ok';
-    return `<span class="bar-wrap"><span class="bar-bg"><span class="bar-fill ${cls}" style="width:${Math.min(pct,100)}%"></span></span><span class="pid">${pct}%</span></span>`;
+    const bc = barClass(pct), vc = valClass(pct);
+    return `<span class="bar-wrap"><span class="bar-bg"><span class="bar-fill ${bc}" style="width:${Math.min(pct,100)}%"></span></span><span class="${vc}">${pct}%</span></span>`;
 }
 function memBar(pct){
-    const cls = pct>=80?'bar-crit':pct>=50?'bar-warn':'bar-ok';
-    return `<span class="bar-wrap"><span class="bar-bg"><span class="bar-fill ${cls}" style="width:${Math.min(pct,100)}%"></span></span><span class="pid">${pct.toFixed(1)}%</span></span>`;
+    const bc = barClass(pct), vc = valClass(pct);
+    return `<span class="bar-wrap"><span class="bar-bg"><span class="bar-fill ${bc}" style="width:${Math.min(pct,100)}%"></span></span><span class="${vc}">${pct.toFixed(1)}%</span></span>`;
+}
+
+function rowCls(cpu, mem){
+    const max = Math.max(cpu||0, mem||0);
+    return max>=80?'row-crit':max>=50?'row-warn':'';
 }
 
 /* ── sparkline SVG ── */
@@ -350,7 +366,9 @@ function renderListening(data){
     document.getElementById('listen-count').textContent=list.length+' port(s)';
     document.getElementById('tc-ports').textContent=list.length;
     const lbody=document.getElementById('listen-body');
-    lbody.innerHTML=list.map(c=>`<tr>
+    lbody.innerHTML=list.map(c=>{
+        const cpu=c.cpu_percent||0, mem=c.memory_percent||0;
+        return `<tr class="${rowCls(cpu,mem)}">
         <td><span class="badge-proto">${esc(c.protocol)}</span></td>
         <td><span class="proc-name">${esc(c.local_addr)}</span></td>
         <td><span class="port-num">${c.local_port|0}</span></td>
@@ -368,7 +386,7 @@ function renderListening(data){
             ${c.service?`<button class="btn-action"
                 data-action="svc-restart" data-svc="${esc(c.service)}">Restart</button>`:''}
         </td>
-    </tr>`).join('');
+    </tr>`;}).join('');
     bindTableActions(lbody);
 }
 
@@ -406,15 +424,16 @@ function renderProcessSummary(data){
     const list=(data.process_summary||[]).sort((a,b)=>(b.cpu_percent||0)-(a.cpu_percent||0));
     document.getElementById('proc-count').textContent=list.length+' processus';
     document.getElementById('tc-procs').textContent=list.length;
-    document.getElementById('stat-procs').textContent=list.length;
     const pbody=document.getElementById('proc-body');
-    pbody.innerHTML=list.map(p=>`<tr>
+    pbody.innerHTML=list.map(p=>{
+        const cpu=p.cpu_percent||0, mem=p.memory_percent||0;
+        return `<tr class="${rowCls(cpu,mem)}">
         <td><span class="pid">${p.pid|0}</span></td>
         <td><span class="proc-name">${esc(p.name||'-')}</span></td>
         <td>${p.service?`<span class="badge-proto">${esc(p.service)}</span>`:'<span class="pid">-</span>'}</td>
         <td><span class="port-num">${p.connections_count|0}</span></td>
-        <td>${cpuBar(p.cpu_percent||0)}</td>
-        <td>${memBar(p.memory_percent||0)}</td>
+        <td>${cpuBar(cpu)}</td>
+        <td>${memBar(mem)}</td>
         <td><span class="pid">↓${fmtBytes(p.io_read_bytes||0)} ↑${fmtBytes(p.io_write_bytes||0)}</span></td>
         <td><span class="pid">${fmtUptime(p.uptime_seconds)}</span></td>
         <td class="actions-cell">
@@ -425,13 +444,18 @@ function renderProcessSummary(data){
             ${p.service?`<button class="btn-action"
                 data-action="svc-restart" data-svc="${esc(p.service)}">Restart</button>`:''}
         </td>
-    </tr>`).join('');
+    </tr>`;}).join('');
+    bindTableActions(pbody);
 }
 
 function renderBandwidth(data){
     const bw=data.bandwidth||[];
     document.getElementById('bw-count').textContent=bw.length+' interface(s)';
-    if(!bw.length){ document.getElementById('bw-body').innerHTML='<tr><td colspan="5" class="empty-cell">Aucune donnee</td></tr>'; document.getElementById('stat-bw').textContent='--'; return; }
+    if(!bw.length){
+        document.getElementById('bw-body').innerHTML='<tr><td colspan="5" class="empty-cell">Aucune donnee</td></tr>';
+        document.getElementById('stat-bw').textContent='--';
+        return;
+    }
     const totalRecv=bw.reduce((s,i)=>s+(i.recv_rate||0),0);
     const totalSent=bw.reduce((s,i)=>s+(i.sent_rate||0),0);
     document.getElementById('stat-bw').textContent=fmtRate(totalRecv+totalSent);
@@ -449,21 +473,32 @@ function renderEvents(data){
     const events=data.events||[];
     document.getElementById('stat-events').textContent=events.length;
     document.getElementById('tc-events').textContent=events.length;
-    if(events.length>0) document.getElementById('tc-events').className='tab-count tab-count-warn';
-    else document.getElementById('tc-events').className='tab-count';
+    const tc = document.getElementById('tc-events');
+    if(events.some(e=>e.severity==='critical')) tc.className='tab-count tab-count-crit';
+    else if(events.length>0) tc.className='tab-count tab-count-warn';
+    else tc.className='tab-count';
     document.getElementById('ev-count').textContent=events.length+' evenement(s)';
-    if(!events.length){ document.getElementById('ev-body').innerHTML='<tr><td colspan="5" class="empty-cell">Aucun evenement</td></tr>'; return; }
-    document.getElementById('ev-body').innerHTML=events.map((e,i)=>{
-        const detail=JSON.stringify(e,null,2);
+    if(!events.length){
+        document.getElementById('ev-body').innerHTML='<tr><td colspan="5" class="empty-cell">Aucun evenement</td></tr>';
+        return;
+    }
+    const sevOrder = {critical:0,warning:1,info:2};
+    const sorted = [...events].sort((a,b)=>(sevOrder[a.severity]??3)-(sevOrder[b.severity]??3));
+    document.getElementById('ev-body').innerHTML=sorted.map((e,i)=>{
+        const sev = e.severity||'info';
+        const detail=esc(JSON.stringify(e,null,2));
         return `<tr class="event-row" onclick="toggleEvent(${i})">
             <td style="width:20px"><span style="color:var(--text-muted);font-size:10px" id="ev-arrow-${i}">▶</span></td>
-            <td><span class="event-severity ${e.severity||'info'}" style="display:inline-block"></span></td>
+            <td><span class="ev-sev-label sev-${sev}" style="display:inline-flex;align-items:center;gap:5px">
+                <span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${sev==='critical'?'var(--danger)':sev==='warning'?'var(--warning)':'var(--accent)'}"></span>
+                <span style="font-size:11px;font-weight:600;color:${sev==='critical'?'var(--danger)':sev==='warning'?'var(--warning)':'var(--accent)'}">${sev}</span>
+            </span></td>
             <td><span class="event-message-cell">${esc(e.message||'-')}</span></td>
             <td><span class="badge-proto">${esc(e.type||e.event_type||'-')}</span></td>
             <td><span class="event-time">${esc(e.iso_time||'')}</span></td>
         </tr>
         <tr class="event-detail-cell" id="ev-detail-${i}">
-            <td colspan="5"><div class="event-detail-box">${esc(detail)}</div></td>
+            <td colspan="5"><div class="event-detail-box">${detail}</div></td>
         </tr>`;
     }).join('');
 }
@@ -472,7 +507,25 @@ function toggleEvent(i){
     const row=document.getElementById('ev-detail-'+i);
     const arrow=document.getElementById('ev-arrow-'+i);
     const open=row.classList.toggle('open');
-    arrow.textContent=open?'▼':'▶';
+    if(arrow) arrow.textContent=open?'▼':'▶';
+}
+
+/* ── system stats ── */
+function renderSystemStats(data){
+    const sys = data.system || {};
+    const cpu = sys.cpu_percent ?? null;
+    const mem = sys.memory_percent ?? null;
+    const cpuEl = document.getElementById('stat-cpu');
+    if(cpu !== null){
+        const bc = barClass(cpu), vc = valClass(cpu);
+        cpuEl.textContent = cpu.toFixed(1) + '%';
+        cpuEl.className = 'stat-card-value ' + (cpu>=80?'val-high':cpu>=50?'val-med':'val-low');
+    } else { cpuEl.textContent = '--'; cpuEl.className = 'stat-card-value'; }
+    if(mem !== null){
+        const mc = mem>=80?'val-high':mem>=50?'val-med':'val-low';
+        document.getElementById('stat-mem-sub').textContent = 'Mem: ' + mem.toFixed(1) + '%';
+        document.getElementById('stat-mem-sub').style.color = mem>=80?'var(--danger)':mem>=50?'var(--warning)':'var(--success)';
+    }
 }
 
 /* ── sparklines from history ── */
@@ -493,7 +546,7 @@ function updateSparklines(){
     drawSparkline('spark-listen',listens,'#10b981');
 }
 
-/* ── event delegation — aucun onclick inline avec données agent ── */
+/* ── event delegation ── */
 function bindTableActions(tbody){
     tbody.addEventListener('click', e => {
         const btn = e.target.closest('[data-action]');
@@ -507,7 +560,7 @@ function bindTableActions(tbody){
     });
 }
 
-/* ── process detail modal — lit depuis le snapshot de l'agent distant ── */
+/* ── process detail modal ── */
 async function openProcModal(pid, name){
     document.getElementById('modal-title').textContent=(name||'Processus')+' — PID '+pid;
     document.getElementById('modal-body').innerHTML='<span class="pid">Chargement...</span>';
@@ -520,8 +573,8 @@ async function openProcModal(pid, name){
         }
         const p=await r.json();
         const cpu=p.cpu_percent||0, mem=p.memory_percent||0;
-        const cpuCls=cpu>=80?'bar-crit':cpu>=50?'bar-warn':'bar-ok';
-        const memCls=mem>=80?'bar-crit':mem>=50?'bar-warn':'bar-ok';
+        const cpuCls=barClass(cpu), memCls=barClass(mem);
+        const cpuVCls=valClass(cpu), memVCls=valClass(mem);
         const body=document.getElementById('modal-body');
         body.innerHTML=`
         <p class="pid" style="margin-bottom:12px">Source: snapshot agent <strong>${esc(p.hostname||HOSTNAME)}</strong></p>
@@ -534,11 +587,11 @@ async function openProcModal(pid, name){
             <div class="detail-row"><span class="detail-label">RSS</span><span class="detail-value">${fmtBytes(p.memory_rss)}</span></div>
             <div class="detail-row">
                 <span class="detail-label">CPU</span>
-                <span class="detail-value"><span class="bar-wrap"><span class="bar-bg"><span class="bar-fill ${cpuCls}" style="width:${Math.min(cpu,100)}%"></span></span> ${cpu}%</span></span>
+                <span class="detail-value"><span class="bar-wrap"><span class="bar-bg"><span class="bar-fill ${cpuCls}" style="width:${Math.min(cpu,100)}%"></span></span></span> <span class="${cpuVCls}">${cpu}%</span></span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">Memoire</span>
-                <span class="detail-value"><span class="bar-wrap"><span class="bar-bg"><span class="bar-fill ${memCls}" style="width:${Math.min(mem,100)}%"></span></span> ${mem.toFixed(1)}%</span></span>
+                <span class="detail-value"><span class="bar-wrap"><span class="bar-bg"><span class="bar-fill ${memCls}" style="width:${Math.min(mem,100)}%"></span></span></span> <span class="${memVCls}">${mem.toFixed(1)}%</span></span>
             </div>
             <div class="detail-row"><span class="detail-label">I/O lu</span><span class="detail-value">${fmtBytes(p.io_read_bytes||0)}</span></div>
             <div class="detail-row"><span class="detail-label">I/O ecrit</span><span class="detail-value">${fmtBytes(p.io_write_bytes||0)}</span></div>
@@ -548,7 +601,6 @@ async function openProcModal(pid, name){
             <button class="btn btn-cancel" id="modal-kill-kill">Kill -9 (SIGKILL)</button>
             <button class="btn btn-cancel" id="modal-close-btn">Fermer</button>
         </div>`;
-        // Boutons du modal sans inline onclick
         body.querySelector('#modal-kill-term').onclick=()=>{ Actions.killProcess(p.pid,p.name); closeModal(); };
         body.querySelector('#modal-kill-kill').onclick=()=>{ Actions.killProcess(p.pid,p.name,'SIGKILL'); closeModal(); };
         body.querySelector('#modal-close-btn').onclick=closeModal;
@@ -558,11 +610,27 @@ async function openProcModal(pid, name){
 function closeModal(){ document.getElementById('proc-modal-overlay').classList.remove('open'); }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeModal(); });
 
+/* ── filters ── */
+function setupFilter(inputId,tableId){
+    const input=document.getElementById(inputId);
+    if(!input)return;
+    input.addEventListener('input',function(){
+        const q=this.value.toLowerCase();
+        document.querySelectorAll('#'+tableId+' tbody tr:not(.event-detail-cell)').forEach(row=>{
+            row.style.display=row.textContent.toLowerCase().includes(q)?'':'none';
+        });
+    });
+}
+setupFilter('listen-filter','listen-table');
+setupFilter('conn-filter','conn-table');
+setupFilter('proc-filter','proc-table');
+
 /* ── main render + refresh ── */
 function renderAll(data){
     document.getElementById('stat-conns').textContent=data.connections_total||0;
     document.getElementById('stat-listen').textContent=data.listening_total||0;
     document.getElementById('last-seen').textContent=data.iso_time||'?';
+    renderSystemStats(data);
     renderBandwidth(data);
     renderListening(data);
     renderProcessSummary(data);
@@ -583,19 +651,6 @@ async function refresh(){
         document.getElementById('live-label').textContent='Offline';
     }
 }
-
-function setupFilter(inputId,tableId){
-    const input=document.getElementById(inputId);
-    if(!input)return;
-    input.addEventListener('input',function(){
-        const q=this.value.toLowerCase();
-        document.querySelectorAll('#'+tableId+' tbody tr.event-row, #'+tableId+' tbody tr:not(.event-detail-cell)').forEach(row=>{
-            row.style.display=row.textContent.toLowerCase().includes(q)?'':'none';
-        });
-    });
-}
-setupFilter('listen-filter','listen-table');
-setupFilter('conn-filter','conn-table');
 
 renderAll({{ host | tojson }});
 loadHistory();

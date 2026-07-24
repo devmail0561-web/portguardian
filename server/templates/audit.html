@@ -23,19 +23,6 @@
     gap: 8px; flex-wrap: wrap;
 }
 .audit-scroll { overflow-y: auto; flex: 1; }
-.audit-empty {
-    display: flex; flex-direction: column; align-items: center;
-    justify-content: center; height: 100%; gap: 8px;
-    color: var(--text-muted); text-align: center; padding: 40px;
-}
-.audit-empty svg { opacity: .25; }
-.audit-empty h3 { font-size: 13px; color: var(--text-secondary); }
-.audit-empty p { font-size: 12px; max-width: 380px; line-height: 1.6; }
-.audit-empty code {
-    display: inline-block; background: var(--bg-tertiary); padding: 1px 6px;
-    border-radius: 3px; font-family: var(--font-mono); font-size: 11px;
-    color: var(--accent); border: 1px solid var(--border-subtle);
-}
 
 /* source selector */
 .source-tabs { display: flex; gap: 2px; }
@@ -67,55 +54,36 @@
 .archive-item.active { background: var(--accent-subtle); border-color: var(--accent); color: var(--accent); }
 .archive-size { color: var(--text-muted); font-size: 10px; }
 
-/* report modal */
-.report-modal {
-    position: fixed; inset: 0; background: rgba(0,0,0,.65);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 10000; opacity: 0; pointer-events: none; transition: opacity 200ms;
+/* PDF print styles */
+@media print {
+    body { background: #fff !important; color: #000 !important; }
+    .topbar, .sidebar, .audit-toolbar, .archives-panel, .audit-table-header { display: none !important; }
+    .audit-layout { height: auto !important; overflow: visible !important; padding: 0 !important; }
+    .audit-table-wrap { border: none !important; overflow: visible !important; max-height: none !important; }
+    .audit-scroll { overflow: visible !important; max-height: none !important; }
+    .app-layout { display: block !important; }
+    .main-content { padding: 0 !important; }
+    .pdf-header { display: block !important; }
 }
-.report-modal.open { opacity: 1; pointer-events: auto; }
-.report-box {
-    background: var(--bg-card); border: 1px solid var(--border-primary);
-    border-radius: var(--radius-lg); width: min(680px, 95vw); max-height: 85vh;
-    display: flex; flex-direction: column; box-shadow: var(--shadow-lg);
+.pdf-header {
+    display: none;
+    padding: 0 0 16px;
+    border-bottom: 2px solid #000;
+    margin-bottom: 16px;
 }
-.report-header {
-    padding: 14px 18px; border-bottom: 1px solid var(--border-subtle);
-    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
-}
-.report-body { padding: 18px; overflow-y: auto; flex: 1; }
-.report-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 3px; }
-.report-close:hover { background: var(--bg-tertiary); }
-
-.report-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
-.report-stat {
-    background: var(--bg-secondary); border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md); padding: 12px 14px; text-align: center;
-}
-.report-stat-value { font-size: 22px; font-weight: 700; font-family: var(--font-mono); }
-.report-stat-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-.report-section { margin-bottom: 16px; }
-.report-section-title {
-    font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .05em; color: var(--text-muted); margin-bottom: 8px;
-    padding-bottom: 6px; border-bottom: 1px solid var(--border-subtle);
-}
-.report-row {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 5px 0; border-bottom: 1px solid var(--border-subtle); font-size: 12px;
-}
-.report-row:last-child { border-bottom: none; }
-.report-row-label { font-family: var(--font-mono); color: var(--text-secondary); }
-.report-row-vals { display: flex; gap: 12px; }
-.report-ok { color: var(--success); font-weight: 600; }
-.report-fail { color: var(--danger); font-weight: 600; }
-.report-total { color: var(--text-muted); }
-.report-period { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+.pdf-header h1 { font-size: 20px; margin: 0 0 4px; }
+.pdf-header p { font-size: 12px; color: #555; margin: 0; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="audit-layout">
+
+    <!-- PDF-only header (hidden on screen) -->
+    <div class="pdf-header" id="pdf-header">
+        <h1>Rapport d'Audit — PortGuardian</h1>
+        <p id="pdf-subtitle">Journal des actions de securite</p>
+    </div>
 
     <!-- Header -->
     <div class="audit-header">
@@ -139,7 +107,10 @@
         <div style="display:flex;gap:6px;margin-left:auto">
             <button class="btn-action" onclick="downloadActive()">Telecharger (.jsonl)</button>
             <button class="btn-action" onclick="downloadCsv()">Exporter CSV</button>
-            <button class="btn btn-primary" style="font-size:12px;padding:5px 12px" onclick="openReport()">Rapport</button>
+            <button class="btn btn-primary" style="font-size:12px;padding:5px 12px" onclick="generatePdf()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;vertical-align:middle;margin-right:4px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                Rapport PDF
+            </button>
         </div>
     </div>
 
@@ -159,7 +130,7 @@
                 <span class="table-count" id="audit-count">—</span>
                 <span class="pid" style="font-size:10px" id="audit-period"></span>
             </div>
-            <span class="pid" style="font-size:10px">Max {{ entries|length }} / 50 affiches — rotation auto a 500</span>
+            <span class="pid" style="font-size:10px">Rotation auto a 500 entrees</span>
         </div>
         <div class="audit-scroll" id="audit-scroll">
             <table id="audit-table" style="width:100%;border-collapse:collapse">
@@ -189,8 +160,7 @@
                     {% endfor %}
                     {% if not entries %}
                     <tr><td colspan="6" class="empty-cell" style="padding:40px;text-align:center">
-                        Aucune action enregistree — l'audit se remplit quand vous effectuez des actions depuis le dashboard
-                        (kill, block-port, block-ip, service, commandes distantes)
+                        Aucune action enregistree — l'audit se remplit quand vous effectuez des actions depuis le dashboard.
                     </td></tr>
                     {% endif %}
                 </tbody>
@@ -198,19 +168,6 @@
         </div>
     </div>
 
-</div>
-
-<!-- Report modal -->
-<div class="report-modal" id="report-modal" onclick="if(event.target===this)closeReport()">
-    <div class="report-box">
-        <div class="report-header">
-            <span style="font-size:14px;font-weight:600">Rapport d'audit</span>
-            <button class="report-close" onclick="closeReport()">✕</button>
-        </div>
-        <div class="report-body" id="report-body">
-            <span class="pid">Chargement...</span>
-        </div>
-    </div>
 </div>
 {% endblock %}
 
@@ -281,26 +238,13 @@ async function loadArchive(name){
         a.classList.toggle('active', a.dataset.name === name);
     });
     document.getElementById('source-label').textContent = name.replace('audit.','').replace('.jsonl.gz','');
-    const r = await fetch('/api/audit/archives/' + encodeURIComponent(name));
-    if(!r.ok) return;
-    // L'archive est un fichier gzip — on ne peut pas le lire directement en JS
-    // On passe par une route qui le décompresse
-    // → utiliser /api/audit?source=<name> n'existe pas; on télécharge simplement
-    // Pour l'affichage on utilise /api/audit/report?source=<name>&format=json et on affiche les stats
-    renderArchiveView(name);
-}
-
-async function renderArchiveView(name){
-    document.getElementById('source-label').textContent = 'Archive: ' + name.replace('audit.','').replace('.jsonl.gz','');
-    document.getElementById('audit-count').textContent = '...';
-    // On ne décompresse pas en JS — afficher un message + bouton télécharger
-    document.getElementById('audit-body').innerHTML = `<tr><td colspan="6" style="padding:30px;text-align:center">
+    document.getElementById('audit-body').innerHTML = `<tr><td colspan="6" style="padding:24px;text-align:center">
         <div style="display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--text-muted)">
-            <span style="font-size:12px">Archive compressée — consultez via téléchargement ou générez un rapport.</span>
+            <span style="font-size:12px">Archive compressee — telechargez ou generez un rapport PDF.</span>
             <div style="display:flex;gap:8px">
                 <button class="btn btn-primary" style="font-size:12px;padding:5px 14px"
-                    onclick="window.location='/api/audit/archives/${esc(name)}'">Télécharger l'archive</button>
-                <button class="btn-action" onclick="openReport()">Rapport de cette archive</button>
+                    onclick="window.location='/api/audit/archives/${esc(name)}'">Telecharger l'archive</button>
+                <button class="btn-action" onclick="generatePdf()">Rapport PDF</button>
             </div>
         </div>
     </td></tr>`;
@@ -314,29 +258,27 @@ async function loadActive(){
         if(!r.ok) return;
         const ct = r.headers.get('content-type')||'';
         if(!ct.includes('application/json')){ window.location.href='/login'; return; }
-        renderEntries(await r.json(), 'active');
+        renderEntries(await r.json());
     }catch(e){}
 }
 
 async function loadAll(){
-    // Charge depuis le rapport "all" pour avoir toutes les entrées
     try{
         const r = await fetch('/api/audit?limit=1000');
         if(!r.ok) return;
-        renderEntries(await r.json(), 'all');
+        renderEntries(await r.json());
     }catch(e){}
 }
 
-function renderEntries(entries, source){
+function renderEntries(entries){
     document.getElementById('audit-count').textContent = entries.length;
     if(!entries.length){
         document.getElementById('audit-body').innerHTML = `<tr><td colspan="6" class="empty-cell" style="padding:40px;text-align:center">
-            Aucune action enregistree — l'audit se remplit quand vous effectuez des actions depuis le dashboard
+            Aucune action enregistree — l'audit se remplit quand vous effectuez des actions depuis le dashboard.
         </td></tr>`;
         document.getElementById('audit-period').textContent = '';
         return;
     }
-    // période
     const ts = entries.map(e=>e.timestamp||0).filter(Boolean);
     if(ts.length >= 2){
         const from = new Date(Math.min(...ts)*1000).toLocaleDateString('fr-FR');
@@ -361,71 +303,29 @@ function downloadActive(){
     window.location.href = '/api/audit/download';
 }
 function downloadCsv(){
-    window.location.href = '/api/audit/report?source=' + encodeURIComponent(_currentSource === 'active' ? 'active' : _currentSource) + '&format=csv';
+    window.location.href = '/api/audit/report?source=' + encodeURIComponent(
+        ['active','all'].includes(_currentSource) ? _currentSource : 'active'
+    ) + '&format=csv';
 }
 
-/* ── report modal ── */
-async function openReport(){
-    document.getElementById('report-modal').classList.add('open');
-    document.getElementById('report-body').innerHTML = '<span class="pid">Chargement...</span>';
+/* ── PDF generation via print ── */
+async function generatePdf(){
+    // Charger les stats du rapport pour le header PDF
     try{
-        const src = ['active','all'].includes(_currentSource) ? _currentSource : _currentSource;
+        const src = ['active','all'].includes(_currentSource) ? _currentSource : 'active';
         const r = await fetch('/api/audit/report?source=' + encodeURIComponent(src));
-        if(!r.ok){ document.getElementById('report-body').innerHTML='<span style="color:var(--danger)">Erreur</span>'; return; }
-        const d = await r.json();
-        const pct = d.total ? Math.round(d.success/d.total*100) : 0;
-        const period = d.period.from
-            ? `${d.period.from.slice(0,10)} → ${d.period.to.slice(0,10)}`
-            : '—';
-        const actions = Object.entries(d.by_action||{}).map(([a,s])=>`
-            <div class="report-row">
-                <span class="report-row-label">${esc(a)}</span>
-                <div class="report-row-vals">
-                    <span class="report-ok">✓ ${s.success}</span>
-                    <span class="report-fail">✗ ${s.failure}</span>
-                    <span class="report-total">${s.total} total</span>
-                </div>
-            </div>`).join('') || '<span class="pid">Aucune action</span>';
-        const users = Object.entries(d.by_user||{}).map(([u,n])=>`
-            <div class="report-row">
-                <span class="report-row-label">${esc(u)}</span>
-                <span class="report-total">${n} action${n>1?'s':''}</span>
-            </div>`).join('') || '<span class="pid">—</span>';
-        document.getElementById('report-body').innerHTML = `
-            <div class="report-period" style="margin-bottom:14px">Periode : ${esc(period)} — source : ${esc(d.source||'?')}</div>
-            <div class="report-grid">
-                <div class="report-stat">
-                    <div class="report-stat-value">${d.total}</div>
-                    <div class="report-stat-label">Actions totales</div>
-                </div>
-                <div class="report-stat">
-                    <div class="report-stat-value" style="color:var(--success)">${d.success}</div>
-                    <div class="report-stat-label">Succes</div>
-                </div>
-                <div class="report-stat">
-                    <div class="report-stat-value" style="color:${d.failure>0?'var(--danger)':'var(--text-muted)'}">${d.failure}</div>
-                    <div class="report-stat-label">Echecs</div>
-                </div>
-            </div>
-            <div class="report-section">
-                <div class="report-section-title">Actions par type</div>
-                ${actions}
-            </div>
-            <div class="report-section">
-                <div class="report-section-title">Actions par source IP</div>
-                ${users}
-            </div>
-            <div style="margin-top:14px;display:flex;gap:8px">
-                <button class="btn btn-primary" style="font-size:12px;padding:5px 14px"
-                    onclick="window.location='/api/audit/report?source=${encodeURIComponent(src)}&format=csv'">
-                    Exporter CSV
-                </button>
-                <button class="btn-action" onclick="closeReport()">Fermer</button>
-            </div>`;
-    }catch(e){ document.getElementById('report-body').innerHTML='<span style="color:var(--danger)">Erreur: '+esc(e.message)+'</span>'; }
+        if(r.ok){
+            const d = await r.json();
+            const period = (d.period && d.period.from)
+                ? `${d.period.from.slice(0,10)} → ${d.period.to.slice(0,10)}`
+                : 'Periode inconnue';
+            const pct = d.total ? Math.round(d.success/d.total*100) : 0;
+            document.getElementById('pdf-subtitle').textContent =
+                `Genere le ${new Date().toLocaleString('fr-FR')} — ${d.total} actions — ${d.success} succes (${pct}%) — ${d.failure} echecs — Periode: ${period}`;
+        }
+    }catch(e){}
+    window.print();
 }
-function closeReport(){ document.getElementById('report-modal').classList.remove('open'); }
-document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeReport(); });
 
 /* ── init + auto-refresh ── */
 loadActive();

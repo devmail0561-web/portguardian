@@ -467,7 +467,17 @@ sudo ln -s /chemin/vers/portguardian/portguardian /usr/local/bin/portguardian
 
 ## Changelog
 
-### v0.3
+### v0.3 (patch UX — 2026-07-24)
+
+#### Refonte interface — interactions et coloration
+
+- **Notifications en modal** — les alertes ne s'affichent plus en section permanente ; un bouton cloche (badge rouge) ouvre un modal triable par severite. Chaque alerte est cliquable pour consulter son detail JSON
+- **Tableau Machines cliquable** — chaque ligne redirige vers la page machine
+- **Coloration utilisation** — barres CPU/mem dans les tableaux : vert (<50 %), jaune (50-80 %), rouge (≥80 %) avec fond de ligne teinte
+- **Page Evenements** — chaque ligne cliquable deplie le detail JSON en ligne inline (▶/▼) ; severite affichee avec dot colore + libelle
+- **Page Firewall** — placeholder bouclier tant qu'aucune machine n'est selectionnee ; message "firewall propre" quand aucune regle active ; ajout du formulaire "Debloquer une IP" manquant
+- **Page Audit — Rapport PDF** — le bouton Rapport genere un PDF via l'impression navigateur (periode, taux de succes injectes dans le header d'impression)
+- **Page Machine** — carte CPU/Mem dedicee coloree dynamiquement ; tab Evenements badge rouge/orange ; evenements tries par severite
 
 #### Serveur web et securite
 

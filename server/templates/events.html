@@ -1,6 +1,22 @@
 {% extends "base.html" %}
 {% block title %}Evenements{% endblock %}
 
+{% block head %}
+<style>
+.ev-sev-label {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 600;
+}
+.ev-sev-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.sev-critical .ev-sev-dot { background: var(--danger); box-shadow: 0 0 4px var(--danger); }
+.sev-warning  .ev-sev-dot { background: var(--warning); }
+.sev-info     .ev-sev-dot { background: var(--accent); }
+.sev-critical .ev-sev-text { color: var(--danger); }
+.sev-warning  .ev-sev-text { color: var(--warning); }
+.sev-info     .ev-sev-text { color: var(--accent); }
+</style>
+{% endblock %}
+
 {% block sidebar_extra %}
 <div class="sidebar-section">
     <div class="sidebar-section-title">Machines ({{ hosts_count }})</div>
@@ -34,11 +50,11 @@
     </div>
 </div>
 
-{% if events %}
 <div class="table-container">
     <table id="events-table">
         <thead>
             <tr>
+                <th style="width:24px"></th>
                 <th>Severite</th>
                 <th>Machine</th>
                 <th>Message</th>
@@ -46,72 +62,138 @@
                 <th>Horodatage</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="events-tbody">
+            {% if events %}
             {% for event in events %}
-            <tr>
-                <td><span class="event-severity {{ event.severity or 'info' }}"></span></td>
+            <tr class="ev-row-click" onclick="toggleEvDetail({{ loop.index0 }})">
+                <td style="width:20px;color:var(--text-muted);font-size:10px" id="ev-arr-{{ loop.index0 }}">▶</td>
+                <td>
+                    <span class="ev-sev-label sev-{{ event.severity or 'info' }}">
+                        <span class="ev-sev-dot"></span>
+                        <span class="ev-sev-text">{{ event.severity or 'info' }}</span>
+                    </span>
+                </td>
                 <td>
                     {% if event.hostname %}
-                    <a href="/host/{{ event.hostname }}" class="host-link">{{ event.hostname }}</a>
+                    <a href="/host/{{ event.hostname }}" class="host-link" onclick="event.stopPropagation()">{{ event.hostname }}</a>
                     {% else %}<span class="pid">-</span>{% endif %}
                 </td>
                 <td><span class="event-message-cell">{{ event.message or event.get('description', '-') }}</span></td>
                 <td><span class="badge-proto">{{ event.type or event.get('event_type', '-') }}</span></td>
                 <td><span class="event-time">{{ event.get('iso_time', '') }}</span></td>
             </tr>
+            <tr class="ev-detail-tr" id="ev-det-{{ loop.index0 }}">
+                <td colspan="6">
+                    <div class="ev-detail-content">{{ event | tojson(indent=2) }}</div>
+                </td>
+            </tr>
             {% endfor %}
+            {% else %}
+            <tr id="events-empty-row">
+                <td colspan="6" class="empty-cell" style="padding:40px;text-align:center">
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--text-muted)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:32px;height:32px;opacity:.3"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                        Aucun evenement — les agents detecteront les changements reseau.
+                    </div>
+                </td>
+            </tr>
+            {% endif %}
         </tbody>
     </table>
 </div>
-{% else %}
-<div class="empty-state">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-    <h3>Aucun evenement</h3>
-    <p>Les evenements apparaitront ici lorsque les agents detecteront des changements reseau.</p>
-</div>
-{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-    function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-    let _evFilter = '';
-    document.getElementById('event-filter').addEventListener('input', function() {
-        _evFilter = this.value.toLowerCase();
-        applyEvFilter();
+/* toggle detail row */
+let _evOpen = new Set();
+function toggleEvDetail(i){
+    const det = document.getElementById('ev-det-'+i);
+    const arr = document.getElementById('ev-arr-'+i);
+    if(!det) return;
+    if(_evOpen.has(i)){
+        det.classList.remove('open');
+        if(arr) arr.textContent='▶';
+        _evOpen.delete(i);
+    } else {
+        det.classList.add('open');
+        if(arr) arr.textContent='▼';
+        _evOpen.add(i);
+    }
+}
+
+/* filter */
+let _evFilter = '';
+document.getElementById('event-filter').addEventListener('input', function() {
+    _evFilter = this.value.toLowerCase();
+    applyEvFilter();
+});
+function applyEvFilter() {
+    let idx = 0;
+    const rows = document.querySelectorAll('#events-tbody tr.ev-row-click');
+    rows.forEach(row => {
+        const show = row.textContent.toLowerCase().includes(_evFilter);
+        row.style.display = show ? '' : 'none';
+        const det = document.getElementById('ev-det-' + idx);
+        if(det) det.style.display = show ? '' : 'none';
+        idx++;
     });
-    function applyEvFilter() {
-        document.querySelectorAll('#events-table tbody tr').forEach(row => {
-            row.style.display = row.textContent.toLowerCase().includes(_evFilter) ? '' : 'none';
-        });
-    }
+}
 
-    async function refreshEvents() {
-        try {
-            const resp = await fetch('/api/events?limit=100');
-            if (!resp.ok) return;
-            const ct = resp.headers.get('content-type') || '';
-            if (!ct.includes('application/json')) { window.location.href = '/login'; return; }
-            const events = await resp.json();
-            const tbody = document.querySelector('#events-table tbody');
-            if (!tbody) return;
-            document.getElementById('events-subtitle').textContent = events.length + ' evenement' + (events.length > 1 ? 's' : '');
-            const sev = ['critical','warning','info'];
-            tbody.innerHTML = events.reverse().map(e => {
-                const severity = sev.includes(e.severity) ? e.severity : 'info';
-                const hn = esc(e.hostname || '');
-                return `<tr>
-                    <td><span class="event-severity ${severity}"></span></td>
-                    <td>${hn ? `<a href="/host/${hn}" class="host-link">${hn}</a>` : '<span class="pid">-</span>'}</td>
-                    <td><span class="event-message-cell">${esc(e.message || e.description || '-')}</span></td>
-                    <td><span class="badge-proto">${esc(e.type || e.event_type || '-')}</span></td>
-                    <td><span class="event-time">${esc(e.iso_time || '')}</span></td>
-                </tr>`;
-            }).join('');
-            applyEvFilter();
-        } catch(e) {}
-    }
-    setInterval(refreshEvents, 5000);
+/* ── rebuild table from API data ── */
+let _allEvents = [];
+
+function buildRows(events){
+    if(!events.length) return `<tr><td colspan="6" class="empty-cell" style="padding:40px;text-align:center">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--text-muted)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:32px;height:32px;opacity:.3"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Aucun evenement.
+        </div>
+    </td></tr>`;
+    const sev = ['critical','warning','info'];
+    return events.map((e,i) => {
+        const severity = sev.includes(e.severity) ? e.severity : 'info';
+        const hn = esc(e.hostname || '');
+        const hostLink = hn
+            ? `<a href="/host/${hn}" class="host-link" onclick="event.stopPropagation()">${hn}</a>`
+            : '<span class="pid">-</span>';
+        const detail = esc(JSON.stringify(e, null, 2));
+        return `<tr class="ev-row-click" onclick="toggleEvDetail(${i})">
+            <td style="width:20px;color:var(--text-muted);font-size:10px" id="ev-arr-${i}">▶</td>
+            <td><span class="ev-sev-label sev-${severity}">
+                <span class="ev-sev-dot"></span>
+                <span class="ev-sev-text">${severity}</span>
+            </span></td>
+            <td>${hostLink}</td>
+            <td><span class="event-message-cell">${esc(e.message || e.description || '-')}</span></td>
+            <td><span class="badge-proto">${esc(e.type || e.event_type || '-')}</span></td>
+            <td><span class="event-time">${esc(e.iso_time || '')}</span></td>
+        </tr>
+        <tr class="ev-detail-tr" id="ev-det-${i}">
+            <td colspan="6"><div class="ev-detail-content">${detail}</div></td>
+        </tr>`;
+    }).join('');
+}
+
+async function refreshEvents() {
+    try {
+        const resp = await fetch('/api/events?limit=200');
+        if (!resp.ok) return;
+        const ct = resp.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) { window.location.href = '/login'; return; }
+        _allEvents = await resp.json();
+        _evOpen = new Set();
+        const reversed = [..._allEvents].reverse();
+        document.getElementById('events-subtitle').textContent =
+            reversed.length + ' evenement' + (reversed.length > 1 ? 's' : '');
+        document.getElementById('events-tbody').innerHTML = buildRows(reversed);
+        applyEvFilter();
+    } catch(e) {}
+}
+
+refreshEvents();
+setInterval(refreshEvents, 5000);
 </script>
 {% endblock %}

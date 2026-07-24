@@ -1053,6 +1053,29 @@ tbody tr:last-child td {
     padding: 40px;
 }
 
+/* ── Utilisation coloree ── */
+.util-low  { color: var(--success); }
+.util-med  { color: var(--warning); font-weight: 600; }
+.util-high { color: var(--danger);  font-weight: 700; }
+.row-crit td { background: rgba(239,68,68,.04); }
+.row-warn td { background: rgba(245,158,11,.04); }
+
+/* ── Machine row clickable ── */
+.machine-row { cursor: pointer; }
+.machine-row:hover td { background: rgba(59,130,246,.06); }
+
+/* ── Event detail inline ── */
+.ev-row-click { cursor: pointer; }
+.ev-row-click:hover td { background: rgba(59,130,246,.06); }
+.ev-detail-tr { display: none; }
+.ev-detail-tr.open { display: table-row; }
+.ev-detail-content {
+    padding: 12px 20px; background: var(--bg-tertiary);
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary);
+    white-space: pre-wrap; word-break: break-all; line-height: 1.6;
+    border-top: 1px solid var(--border-subtle);
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
     .app-layout {
