@@ -299,32 +299,48 @@ Serveur web centralise qui recoit les rapports des agents et expose un dashboard
 | Multi-machines | `--password <mdp> --api-key <cle> --allow-remote` | Production reseau |
 
 - Authentification obligatoire sur toutes les pages (sauf `--no-auth`)
+- `--no-auth` verouille sur localhost cote serveur ET cote CLI (double protection, reverse proxy inclus)
 - `--no-auth` refuse de se combiner avec `--allow-remote`
-- Protection CSRF sur les endpoints d'action
-- Rate limiting (10 actions/min/IP)
-- Audit log de chaque action (fichier + memoire)
+- `--debug` refuse de se combiner avec `--allow-remote` (debugger Werkzeug non expose)
+- Protection CSRF sur tous les endpoints d'action (token par session)
+- Rate limiting sur les actions (10/min/IP) ET sur `/login` (anti brute force)
+- Cookies de session : `SameSite=Lax`, `HttpOnly`
+- Audit log de chaque action (fichier JSON-lines + buffer memoire)
 - Bind `127.0.0.1` par defaut
+- Actions distantes validees cote serveur (whitelist, params types)
+- Queue de commandes : max 50 par agent, TTL 1h, nettoyage automatique
+
+#### Architecture multi-machines et actions
+
+Les actions depuis le dashboard (kill, block-port, block-ip, service) sont **routees vers la bonne machine** :
+
+- Page `/host/<hostname>` → commandes envoyees uniquement a l'agent de cette machine
+- Page `/firewall` → selecteur de machine, commandes envoyees a l'agent selectionne
+- Mecanisme : queue de commandes cote serveur, l'agent pull a chaque cycle et execute localement
+- Regles firewall : chaque agent collecte ses propres regles et les inclut dans son snapshot
 
 #### API REST
 
-| Endpoint | Methode | Description |
-|----------|---------|-------------|
-| `/api/report` | POST | Reception des snapshots agents |
-| `/api/heartbeat` | POST | Heartbeat agent (statut de connexion) |
-| `/api/hosts` | GET | Liste des machines |
-| `/api/hosts/<hostname>` | GET | Detail complet d'une machine |
-| `/api/hosts/<hostname>/history` | GET | Historique d'une machine |
-| `/api/events` | GET | Evenements globaux recents |
-| `/api/firewall/rules` | GET | Regles firewall actives |
-| `/api/audit` | GET | Journal d'audit des actions |
-| `/api/commands/<hostname>` | GET | Commandes en attente pour un agent |
-| `/api/commands/<hostname>` | POST | Envoyer une commande a un agent |
-| `/api/actions/kill` | POST | Tuer un processus |
-| `/api/actions/block-port` | POST | Bloquer un port |
-| `/api/actions/unblock-port` | POST | Debloquer un port |
-| `/api/actions/block-ip` | POST | Bloquer une IP |
-| `/api/actions/unblock-ip` | POST | Debloquer une IP |
-| `/api/actions/service` | POST | Gerer un service systemd |
+| Endpoint | Methode | Auth | Description |
+|----------|---------|------|-------------|
+| `/api/report` | POST | API key | Reception des snapshots agents |
+| `/api/heartbeat` | POST | API key | Heartbeat agent |
+| `/api/commands/<hostname>` | GET | API key | Commandes en attente pour un agent |
+| `/api/commands/<hostname>` | POST | Session+CSRF | Envoyer une commande a un agent |
+| `/api/hosts` | GET | Session | Liste des machines |
+| `/api/hosts/<hostname>` | GET | Session | Detail complet d'une machine |
+| `/api/hosts/<hostname>/history` | GET | Session | Historique (sparklines) |
+| `/api/hosts/<hostname>/firewall` | GET | Session | Regles firewall de la machine |
+| `/api/hosts/<hostname>/process/<pid>` | GET | Session | Detail processus depuis snapshot |
+| `/api/stats/<hostname>` | GET | Session | Series temporelles |
+| `/api/events` | GET | Session | Evenements globaux recents |
+| `/api/audit` | GET | Session | Journal d'audit des actions |
+| `/api/actions/kill` | POST | Session+CSRF | Tuer un processus (serveur local) |
+| `/api/actions/block-port` | POST | Session+CSRF | Bloquer un port (serveur local) |
+| `/api/actions/unblock-port` | POST | Session+CSRF | Debloquer un port (serveur local) |
+| `/api/actions/block-ip` | POST | Session+CSRF | Bloquer une IP (serveur local) |
+| `/api/actions/unblock-ip` | POST | Session+CSRF | Debloquer une IP (serveur local) |
+| `/api/actions/service` | POST | Session+CSRF | Gerer un service (serveur local) |
 
 ---
 
@@ -453,24 +469,48 @@ sudo ln -s /chemin/vers/portguardian/portguardian /usr/local/bin/portguardian
 
 ### v0.3
 
-- **Securite du serveur web** — authentification obligatoire (mot de passe + sessions signees), protection CSRF, rate limiting, audit log
-- **Mode `--no-auth`** — acces libre pour usage local/educatif (localhost uniquement, refuse de se combiner avec `--allow-remote`)
-- **Actions depuis le dashboard** — kill processus, bloquer/debloquer ports et IPs, gerer services systemd, tout depuis le navigateur avec confirmation
-- **Page Firewall** — consultation des regles actives, formulaires de blocage, detection du backend
-- **Page Audit** — journal horodate de toutes les actions effectuees
-- **Commandes a distance** — envoyer des ordres aux agents depuis le dashboard (kill, block, service) via queue de commandes
-- **Agent enrichi** — collecte CPU/memoire/I/O par processus, resolution DNS inverse, detection services systemd, metriques systeme globales
-- **Agent fiable** — queue locale (max 100 snapshots), retry avec backoff exponentiel, flush automatique quand le serveur revient, heartbeat
+#### Serveur web et securite
+
+- **Authentification obligatoire** — mot de passe (PBKDF2), sessions signees, CSRF, `SameSite=Lax`, `HttpOnly`
+- **Mode `--no-auth`** — acces libre pour usage local/educatif, verouille sur `127.0.0.1` cote CLI et cote serveur (protection contre les reverse proxies)
+- **Rate limiting** — 10 actions/min/IP sur les endpoints d'action, protection brute force sur `/login`
+- **`--debug` interdit avec `--allow-remote`** — le debugger Werkzeug ne peut pas etre expose sur le reseau
+- **Audit log** — journal horodate de toutes les actions (fichier JSON-lines + buffer memoire)
+- **API key masquee** — non exposee dans le HTML du dashboard
+- **Cookies securises** — `SameSite=Lax` + `HttpOnly`
+
+#### Actions et isolation multi-machines
+
+- **Actions depuis le dashboard** — kill processus, bloquer/debloquer ports et IPs, gerer services systemd, avec confirmation
+- **Isolation garantie** — chaque action est routee uniquement vers la machine concernee via la queue de commandes ; impossible qu'une commande toucheune autre machine
+- **Page Firewall par machine** — selecteur de machine, regles specifiques a chaque agent (chaque agent collecte ses propres regles dans son snapshot)
+- **Queue de commandes** — max 50 commandes par agent, TTL 1h, validation des params cote serveur (whitelist d'actions, types)
+- **Page Audit** — journal de toutes les actions avec filtre persistant apres refresh AJAX
+
+#### Interface et ergonomie
+
+- **Navigation par onglets** — page machine sans scroll : Ports / Connexions / Processus / Bande passante / Evenements
+- **Sparklines SVG** — historique des connexions et ports dans le temps
+- **Barres CPU/memoire** — dans les tableaux Ports et Processus, avec code couleur
+- **Modal detail processus** — lit les donnees du snapshot de l'agent distant (pas du serveur local)
+- **Evenements cliquables** — detail JSON depliable par evenement
+- **Filtre AJAX** — reapplique automatiquement apres chaque refresh
+- **Session expiree** — detection + redirection `/login` au lieu d'echec silencieux
+
+#### Agent enrichi
+
+- **Collecte firewall** — chaque agent remonte ses propres regles (backend + regles actives) dans le snapshot
+- **Collecte CPU/memoire/I/O** par processus, resolution DNS inverse, detection services systemd, metriques systeme globales
+- **Fiabilite** — queue locale (max 100 snapshots), retry avec backoff exponentiel, flush automatique, heartbeat
 - **Rotation historique** — par nombre de fichiers ET par taille totale (max 100 MB)
-- **Dashboard fluide** — refresh AJAX toutes les 5s sans rechargement de page, rendu cote client
-- **Section processus reseau** — vue consolidee par processus (CPU, memoire, I/O, uptime, service, nombre de connexions)
-- **Bande passante par interface** — download/upload en temps reel + totaux cumules
-- **Blocage d'adresses IP** — blocage/deblocage d'IPs (IPv4, IPv6, CIDR) via touche `i`, support des 4 backends firewall
-- **Script unifie `./portguardian`** — remplace les multiples commandes `python3 -m ...` par un point d'entree unique (tui, server, agent, scan, help)
-- **Corrections firewall** — fix iptables `--dport` sur OUTPUT, fix syntaxe rich rule firewalld, fix match exact nftables, fix deblocage bidirectionnel ufw
-- **Persistance nftables** — les regles sont sauvegardees dans `/etc/nftables.d/portguardian.nft` pour survivre au reboot
-- **Fix watcher** — suppression du raccourci par comptage qui masquait les changements simultanes (port ouvert + port ferme en meme temps)
-- **Bind `127.0.0.1` par defaut** — le serveur n'est plus expose au reseau sans opt-in explicite (`--allow-remote`)
+
+#### Corrections
+
+- **Bind `127.0.0.1` par defaut** — serveur non expose sans `--allow-remote` explicite
+- **Script unifie `./portguardian`** — point d'entree unique (tui, server, agent, scan, help)
+- **Corrections firewall** — fix iptables OUTPUT, syntaxe firewalld, match exact nftables, deblocage bidirectionnel ufw
+- **Persistance nftables** — regles dans `/etc/nftables.d/portguardian.nft`
+- **Fix watcher** — changements simultanes (port ouvert + ferme) correctement detectes
 
 ### v0.2
 
